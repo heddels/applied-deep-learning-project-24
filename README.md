@@ -3,41 +3,56 @@
 ## Project Overview
 In this project, I aim to tackle the challenge of media bias detection, particularly in an age where information 
 overload and cognitive biases make it increasingly difficult for individuals to critically analyze the media they consume. 
-Drawing on established research in automated bias detection, I plan to build a tool that helps users identify 
+Drawing on established research in automated bias detection, I plan to build a model that helps identify 
 potential biases in news articles, primarily as a reminder to remain critical without replacing personal judgment.
 
 
-### Idea and Approach
-The project will be a mix of Bring Your Own Method and Bring Your Own Data. Existing models, such as MAGPIE 
-(Horych et al., 2024) and earlier works like form Spinde et al. (2022), have made significant advancements in 
-automated media bias detection, particularly for English-language data. My approach involves adapting these models 
-for German-language news by filtering the Large Bias Mixture (LBM) dataset and simplifying the architecture to 
-make it computationally feasible.
+## Idea and Approach
+The project will be a mix of *Bring Your Own Method* and *Bring Your Own Data*. Existing models, such as MAGPIE 
+(Horych et al., 2024) and earlier works like form Spinde et al. (2022), have already made significant advancements in 
+automated media bias detection with deep learning models, particularly for English-language data. 
+My approach involves adapting these models by simplifying the architecture to make it computationally more feasible 
+while trying to preserve accuracy.
 
 Key modifications include:
 
- - Replacing MAGPIE’s pre-trained model with DistilBERT, which is more efficient and suitable for the available 
-computational resources.
-- Simplifying and redesigning MAGPIE’s architecture, leveraging the foundational work of Spinde et al. (2022), 
-whose model uses a simpler framework.
+- Replacing MAGPIE’s pre-trained model encoder RoBERTa with DistilBERT, which is more efficient and suitable for the available computational resources.
+- Simplifying and redesigning MAGPIE’s architecture, leveraging the foundational work of Spinde et al. (2022), whose model uses a simpler framework.
+- Reducing the number of datasets and tasks in the multitask learning setup to decrease the computational load.
 
 To present my work, I aim to build a simple interface where users can input text and receive bias detection results. 
-Menzner & Leidner (2024) developed a similar interface using GPT-3.5. However, I aim to implement the architecture 
-described above for more targeted and resource-efficient bias detection. 
+Menzner & Leidner (2024) developed a similar interface using GPT-3.5. However, I will implement the architecture 
+described above for a more targeted and resource-efficient bias detection solution.
 
 
-### The Dataset
-As mentioned I want to use the LBM data set filtered for German articles.However, I have to find those datasets 
-also available in German language and possibly add other existing datasets o the collection. Therefore, 
-I take the listed datasets from the MAGPIE paper as a starting point and search for German versions of them.
+## The Dataset
+As mentioned above, in order for the project to be feasible, I will need to simplify the data for the multitask learning setup.
+Therefore, I will use the following  datasets from the MAGPIE paper, being the smallest datasets in each task family, 
+except for the News bias task family:
 
+| Task Family| Dataset | # sentences   | Task |
+|--------------------|------------------------------------------------|---------------|----------------------------|
+| Subjective bias    | NewsWCL50 (Hamborg et al., 2019)               | 731           | Regression                 |
+| News bias          | BABE (Spinde et al., 2021c)                    | 3,672         | Token-Level Classification |
+| Hate speech        | MeTooMA (Gautam et al., 2020)                  | 7,388         | Binary Classification      |
+| Gender bias        | GAP (Webster et al., 2018)                     | 4,373         | Binary Classification      |
+| Sentiment analysis | MDGender (Din et al., 2020)                    | 2,332         | Binary Classification      |
+| Fake news          | MPQA (Wilson, 2008)                            | 5,508         | Token-Level Classification |
+| Emotionally        | GoodNewsEveryone (Bostan et al., 2020)         | 4,428         | Token-Level Classification |
+| Group bias         | StereotypeDataset (Pujari et al., 2022)        | 2,208         | Binary Classification      |
+| Stance detection   | GWSD (Luo et al., 2020)                        | 2,010         | Multi-Class Classification |
 
-### Work Breakdown Structure
-Table 1: Work Breakdown Structure
+The datasets are available in the MAGPIE repository, and I will use the same data preprocessing steps as in the original paper.
+
+However, the final choice of datasets is subject to change based on the computational resources available and the 
+model's performance during the hacking phase of the project.
+
+## Work Breakdown Structure
+The following table outlines the tasks and their respective time estimates and due dates for the project:
 
 | Task | Time Estimate (hrs) | Due Date |
 | --- |---------------------|----------|
-| Dataset Collection | 8-18                | 27.10.24 |
+| Dataset Collection | 2                   | 24.10.24 |
 | Designing and Building an Appropriate Network | 15-20               | 17.11.24 |
 | Training and Fine-tuning that Network | 20-25               | 17.12.24 |
 | Building an Application to Present the Results | 15-20               | 05.01.25 |
