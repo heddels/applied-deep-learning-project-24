@@ -86,155 +86,65 @@ for the detection of media bias in news articles.** In Information for a better 
 [Link to the paper](https://arxiv.org/abs/2211.03491), 
 [Link to the Github implementation](https://github.com/Media-Bias-Group/Exploiting-Transformer-based-Multitask-Learning-for-the-Detection-of-Media-Bias-in-News-Articles)
 
-############################################################################################################
+----------------------------------------------------------------------------------------------------------------
+# Hacking Phase Documentation
 
+## Actual Time Tracking
+ ....
 
-### From End to end Deep Learning Project Implementation
+## Error Metric Specification
+The error metric for this project is the F1 score, which is the harmonic mean of precision and recall.
+It is chosen, because it is suited for the classification problem at hand and also used in the MAGPIE paper, which is the basis for this project.
 
-## Workflows
+The target value however is not the one achieved by MAGPIE, since I chose a simpler setup.
+Therefore, the target I take is the one from the other MTL Approach by Spinde et al. (2022), which is 0.78 for the MTL.
+**Insert picture of the table of the metrics here**
 
-1. Update config.yaml
-2. Update secrets.yaml [Optional] # secret credentials that I do not want to share
-3. Update params.yaml
-4. Update the entity 
-5. Update the configuration manager in src config 
-6. Update the components
-7. Update the pipeline 
-8. Update the main.py
-9. Update the dvc.yaml
+## New Organization of Source Code
+```
+pproject_root/
+│
+├── src/                               # Core source code
+│   ├── __init__.py
+│   │
+│   ├── data/                         # Data processing and handling
+│   │   ├── __init__.py              
+│   │   ├── task.py                   # Task and Subtask classes for MTL settings
+│   │   ├── dataset.py                # Dataset classes for data loading, preprocessing
+│   │
+│   ├── model/                        # Model architecture components
+│   │   ├── __init__.py
+│   │   ├── model.py                  # Main MTL model combining backbone and heads
+│   │   ├── heads.py                  # Task-specific model heads (classification etc.)
+│   │   ├── backbone.py               # Shared DistilBERT backbone
+│   │   └── gradient.py               # Gradient management for MTL
+│   │
+│   ├── training/                     # Training components
+│   │   ├── __init__.py
+│   │   ├── trainer.py                # Main training loop and logic
+│   │   ├── checkpoint.py             # Model checkpointing
+│   │   ├── logger.py                 # Training logging to wandb
+│   │   ├── metrics.py                # Metrics tracking and computation
+│   │   └── training_utils.py         # Training helper functions
+│   │
+│   └── utils/                        # Source-specific utilities
+│       ├── __init__.py
+│       └── tokenizer.py              # Tokenizer initialization
+│
+├── utils/                            # Global utilities
+│   ├── __init__.py
+│   ├── common.py                     # Common helper functions
+│   ├── enums.py                      # Enumerations for model settings
+│   ├── logger.py                     # Global logging setup
+│   └── transformer.py                # Transformer model utilities
+│
+├── config/                           # Configuration settings
+│   ├── __init__.py
+│   └── config.py                     # Model and training parameters
+│
+├── research/                         # Research and experiments
+│   └── test.ipynb                        # Testing notebook for model components
 
-
-
-
-
-## MLflow
-
-- [Documentation](https://mlflow.org/docs/latest/index.html)
-
-- [MLflow tutorial](https://youtube.com/playlist?list=PLkz_y24mlSJZrqiZ4_cLUiP0CBN5wFmTb&si=zEp_C8zLHt1DzWKK)
-
-##### cmd
-- mlflow ui
-
-### dagshub
-[dagshub](https://dagshub.com/)
-
-
-Run this to export as env variables:
-for tokens: https://dagshub.com/user/settings/tokens
-
-```bash
-
-export MLFLOW_TRACKING_URI=https://dagshub.com/heddels/applied-deep-learning-project-24.mlflow
-
-export MLFLOW_TRACKING_USERNAME=heddels 
-
-export MLFLOW_TRACKING_PASSWORD=1fbf32fd355adaa752281459f4516b0d37b109eb
-  
 ```
 
-dlproject-mlflow-buc 
-
-
-
-### DVC cmd
-
-1. dvc init
-2. dvc repro
-3. dvc dag
-
-
-## About MLflow & DVC
-
-MLflow
-
- - Its Production Grade
- - Trace all of your expriements
- - Logging & taging your model
-
-
-DVC 
-
- - Its very lite weight for POC only
- - lite weight expriements tracker
- - It can perform Orchestration (Creating Pipelines)
-
-
-
-# AWS-CICD-Deployment-with-Github-Actions
-
-## 1. Login to AWS console.
-
-## 2. Create IAM user for deployment
-
-	#with specific access
-
-	1. EC2 access : It is virtual machine
-
-	2. ECR: Elastic Container registry to save your docker image in aws
-
-
-	#Description: About the deployment
-
-	1. Build docker image of the source code
-
-	2. Push your docker image to ECR
-
-	3. Launch Your EC2 
-
-	4. Pull Your image from ECR in EC2
-
-	5. Lauch your docker image in EC2
-
-	#Policy:
-
-	1. AmazonEC2ContainerRegistryFullAccess
-
-	2. AmazonEC2FullAccess
-
-	
-## 3. Create ECR repo to store/save docker image
-    - Save the URI: 566373416292.dkr.ecr.us-east-1.amazonaws.com/chicken
-
-	
-## 4. Create EC2 machine (Ubuntu) 
-
-## 5. Open EC2 and Install docker in EC2 Machine:
-	
-	
-	#optinal
-
-	sudo apt-get update -y
-
-	sudo apt-get upgrade
-	
-	#required
-
-	curl -fsSL https://get.docker.com -o get-docker.sh
-
-	sudo sh get-docker.sh
-
-	sudo usermod -aG docker ubuntu
-
-	newgrp docker
-	
-# 6. Configure EC2 as self-hosted runner:
-    setting>actions>runner>new self hosted runner> choose os> then run command one by one
-
-
-# 7. Setup github secrets:
-
-    AWS_ACCESS_KEY_ID=
-
-    AWS_SECRET_ACCESS_KEY=
-
-    AWS_REGION = us-east-1
-
-    AWS_ECR_LOGIN_URI = demo>>  566373416292.dkr.ecr.ap-south-1.amazonaws.com
-
-    ECR_REPOSITORY_NAME = simple-app
-
-
-   
-   
 

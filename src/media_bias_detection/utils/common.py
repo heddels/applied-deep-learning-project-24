@@ -1,7 +1,7 @@
 import os
 from box.exceptions import BoxValueError
 import yaml
-from utils.logger import general_logger
+from media_bias_detection.utils.logger import general_logger
 import json
 import joblib
 from ensure import ensure_annotations
@@ -14,7 +14,7 @@ import random
 import numpy as np
 import torch
 
-from config.config import RANDOM_SEED
+from media_bias_detection.config.config import RANDOM_SEED
 
 
 @ensure_annotations
