@@ -1,3 +1,5 @@
+
+
 """Dataset handling module for MTL model.
 
 This module provides dataset classes for handling different types of data loading
@@ -14,6 +16,7 @@ from collections import defaultdict
 
 from media_bias_detection.utils.logger import general_logger
 from media_bias_detection.utils.enums import Split
+from media_bias_detection.utils.common import set_random_seed
 from .task import SubTask
 
 #data class thing is not han
@@ -32,7 +35,6 @@ class BatchData:
     attention_mask: torch.Tensor
     labels: torch.Tensor
     subtask_id: int
-
 
 class SubTaskDataset(Dataset):
     """Dataset class for a single SubTask.
@@ -129,8 +131,9 @@ class SubTaskDataset(Dataset):
     def _reset(self) -> None:
         """Reset the dataset state and shuffle observations."""
         general_logger.info(f"Resetting dataset for subtask {self.subtask.id}")
-        self.observations = list(range(len(self.subtask.get_X(split=self.split))))
-        np.random.shuffle(self.observations)
+        self.observations = [i for i in range(len(self.subtask.get_X(split=self.split)))]
+        set_random_seed()
+        np.random.shuffle(self.observations)  # Not a real 'reshuffling' as it will always arrange same.
         self._counter = 0
         self._cache.clear()
 
@@ -230,53 +233,24 @@ class BatchList:
             general_logger.error(f"Error generating batch: {str(e)}")
             raise RuntimeError(f"Batch generation failed: {str(e)}")
 
-    def get_statistics(self) -> Dict[str, int]:
-        """Get statistics about batches generated.
-
-        Returns:
-            Dictionary mapping subtask IDs to number of batches generated
-        """
-        return dict(self._batch_counts)
+    def _reset(self):
+        """Reset this BatchListEvalTest."""
+        self.iter_dataloaders = {f"{st_id}": iter(dl) for st_id, dl in self.dataloaders.items()}
 
 
-class BatchListEvalTest(BatchList):
-    """BatchList variant for evaluation and testing.
+class BatchListEvalTest:
+    """A BatchListEvalTest is a wrapper around dataloaders for each subtask."""
 
-    This class modifies the batch generation behavior to stop when any task's
-    data is exhausted, making it suitable for evaluation and testing where
-    we need to process all data exactly once.
-    """
+    def __init__(self, subtask_list: List[SubTask], sub_batch_size, split=Split.TRAIN):
+        self.sub_batch_size = sub_batch_size
+        self.datasets = {f"{st.id}": SubTaskDataset(subtask=st, split=split) for st in subtask_list}
+        self.dataloaders = {
+            f"{st_id}": DataLoader(ds, batch_size=self.sub_batch_size) for st_id, ds in self.datasets.items()
+        }
+        self.iter_dataloaders = {f"{st_id}": iter(dl) for st_id, dl in self.dataloaders.items()}
 
-    def __next__(self) -> Optional[List[BatchData]]:
-        """Get next batch of sub-batches, or None if any task is exhausted.
-
-        Returns:
-            List of BatchData or None if iteration is complete
-        """
-        try:
-            data = []
-
-            for st_id, dl in self.iter_dataloaders.items():
-                try:
-                    batch = next(dl)
-                    data.append(batch)
-                except StopIteration:
-                    return None
-
-            return data
-
-        except Exception as e:
-            general_logger.error(f"Error in evaluation batch generation: {str(e)}")
-            raise RuntimeError(f"Evaluation batch generation failed: {str(e)}")
-
-    def __len__(self) -> int:
-        """Get total number of batches needed for full evaluation."""
+    def __len__(self):
         return min(len(dl) for dl in self.dataloaders.values())
 
-    def reset(self) -> None:
-        """Reset all iterators for a new evaluation pass."""
-        general_logger.info("Resetting evaluation batch iterators")
-        self.iter_dataloaders = {
-            st_id: iter(dl)
-            for st_id, dl in self.dataloaders.items()
-        }
+    def _reset(self): # Add this method matching the original
+        self.iter_dataloaders = {f"{st_id}": iter(dl) for st_id, dl in self.dataloaders.items()}

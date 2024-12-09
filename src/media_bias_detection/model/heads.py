@@ -45,6 +45,8 @@ def HeadFactory(st: SubTask, *args, **kwargs) -> 'BaseHead':
     """
     try:
         if isinstance(st, ClassificationSubTask):
+            print(f"Creating ClassificationHead for subtask {st.id}")
+            print(f"num_classes: {st.num_classes}")
             return ClassificationHead(
                 num_classes=st.num_classes,
                 class_weights=st.class_weights,
@@ -52,9 +54,11 @@ def HeadFactory(st: SubTask, *args, **kwargs) -> 'BaseHead':
                 **kwargs
             )
         elif isinstance(st, MultiLabelClassificationSubTask):
-            return MultiLabelClassificationHead(
+            print(f"Creating MultiLabelClassificationHead for subtask {st.id}")
+            print(f"num_classes: {st.num_classes}, num_labels: {st.num_labels}")
+            return ClassificationHead(
                 num_classes=st.num_classes,
-                num_labels=st.num_labels,
+                num_labels=st.num_labels if st.num_labels is not None else 2,
                 class_weights=st.class_weights,
                 *args,
                 **kwargs
@@ -101,18 +105,6 @@ class BaseHead(GradsWrapper):
 
 
 class ClassificationHead(BaseHead):
-    """Classification head for binary and multi-class tasks.
-
-    Attributes:
-        dense: Dense layer for feature transformation
-        dropout: Dropout layer for regularization
-        out_proj: Output projection layer
-        num_classes: Number of classes
-        num_labels: Number of labels (1 for standard classification)
-        loss: Loss function
-        metrics: Dictionary of metrics
-    """
-
     def __init__(
             self,
             input_dimension: int,
@@ -123,35 +115,59 @@ class ClassificationHead(BaseHead):
             class_weights: Optional[torch.Tensor] = None
     ):
         super().__init__()
+        print(f"Initializing ClassificationHead")
+        print(f"num_classes: {num_classes}")
+        print(f"num_labels: {num_labels}")
 
+        # Common layers
         self.dense = nn.Linear(input_dimension, hidden_dimension)
         self.dropout = nn.Dropout(p=dropout_prob)
         self.out_proj = nn.Linear(hidden_dimension, num_classes * num_labels)
 
+        # Store dimensions
         self.num_classes = num_classes
         self.num_labels = num_labels
+
+        # Use CrossEntropyLoss for both cases
         self.loss = nn.CrossEntropyLoss(weight=class_weights)
-
-        self.metrics = {
-            "f1": F1Score(
-                num_classes=num_classes,
-                task="binary" if num_classes == 2 else "multiclass",
-                average="macro"
-            ),
-            "acc": Accuracy(task="binary" if num_classes == 2 else "multiclass",
-        num_classes=num_classes),
-        }
-
-        general_logger.info(
-            f"Initialized ClassificationHead with {num_classes} classes"
-        )
+        print(f"Initializing ClassificationHead with {num_labels} labels")
+        # Set up metrics based on task type
+        if num_labels > 1:  # Multi-label case
+            self.metrics = {
+                "f1": F1Score(
+                    num_classes=num_classes,
+                    num_labels=num_labels,
+                    task="multilabel",
+                    average="macro"
+                ),
+                "acc": Accuracy(
+                    task="multilabel",
+                    num_classes=num_classes,
+                    num_labels=num_labels,
+                ),
+            }
+        else:  # Regular classification case
+            self.metrics = {
+                "f1": F1Score(
+                    num_classes=num_classes,
+                    task="binary" if num_classes == 2 else "multiclass",
+                    average="macro"
+                ),
+                "acc": Accuracy(
+                    task="binary" if num_classes == 2 else "multiclass",
+                    num_classes=num_classes,
+                ),
+            }
 
     def forward(self, X: torch.Tensor, y: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, Dict]:
         try:
             batch_size = y.shape[0]
+            print(f"Batch size: {batch_size}")
+            print(f"X shape: {X.shape}")
+            print(f"y shape: {y.shape}")
 
             # Get CLS token representation
-            x = X[:, 0, :]
+            x = X[:, 0, :]  # take <s> token (equiv. to [CLS])
 
             # Pass through layers
             x = self.dropout(x)
@@ -160,12 +176,27 @@ class ClassificationHead(BaseHead):
             x = self.dropout(x)
             logits = self.out_proj(x)
 
-            # Compute loss and metrics
+            # Compute loss
             loss = self.loss(logits.view(-1, self.num_classes), y.view(-1))
-            logits = logits.view(batch_size, self.num_classes, self.num_labels)
+            print(f"Logits shape: {logits.shape}")
 
+            # Reshape logits based on task type
+            if self.num_labels > 1:  # Multi-label case
+                logits = logits.view(batch_size, self.num_labels, self.num_classes)
+                y = y.view(batch_size, self.num_labels)
+            else:  # Binary/multiclass case
+                logits = logits.view(batch_size, self.num_classes)
+                y = y.view(batch_size)  # Flatten targets
+
+            # Compute loss
+            loss = self.loss(logits, y)
+
+            # Get predictions in correct shape for metrics
+            predictions = torch.argmax(logits, dim=-1)  # Use last dimension for class prediction
+
+            # Calculate metrics
             metrics = {
-                name: metric(logits.cpu(), y.cpu())
+                name: metric(predictions.cpu(), y.cpu())
                 for name, metric in self.metrics.items()
             }
 
@@ -236,8 +267,10 @@ class TokenClassificationHead(BaseHead):
             y = torch.masked_select(y, mask == 1)
             logits = logits.view(y.shape[0], self.num_classes)
 
+            # calculate metrics with predictions instead of logits
+            predictions = torch.argmax(logits, dim=1)
             metrics = {
-                name: metric(logits.cpu(), y.cpu())
+                name: metric(predictions.cpu(), y.cpu())
                 for name, metric in self.metrics.items()
             }
 
@@ -245,88 +278,6 @@ class TokenClassificationHead(BaseHead):
 
         except Exception as e:
             raise HeadError(f"Token classification forward pass failed: {str(e)}")
-
-
-class MultiLabelClassificationHead(BaseHead):
-    """Head for multi-label classification tasks.
-
-    Attributes:
-        dense: Dense layer
-        dropout: Dropout layer
-        out_proj: Output projection layer
-        num_classes: Number of classes per label
-        num_labels: Number of labels to predict
-        loss: Loss function
-        metrics: Dictionary of metrics
-    """
-
-    def __init__(
-            self,
-            input_dimension: int,
-            hidden_dimension: int,
-            dropout_prob: float,
-            num_classes: int = 2,
-            num_labels: int = 2,
-            class_weights: Optional[torch.Tensor] = None
-    ):
-        super().__init__()
-
-        self.dense = nn.Linear(input_dimension, hidden_dimension)
-        self.dropout = nn.Dropout(p=dropout_prob)
-        self.out_proj = nn.Linear(hidden_dimension, num_classes * num_labels)
-
-        self.num_classes = num_classes
-        self.num_labels = num_labels
-
-        # Use BCEWithLogitsLoss for multi-label
-        self.loss = nn.BCEWithLogitsLoss(pos_weight=class_weights)
-
-        self.metrics = {
-            "f1": F1Score(
-                num_classes=num_classes * num_labels,
-                task="multilabel",
-                average="macro"
-            ),
-            "acc": Accuracy(
-                task="multilabel",
-                num_classes=num_classes * num_labels
-            ),
-        }
-
-        general_logger.info(
-            f"Initialized MultiLabelClassificationHead with {num_classes} "
-            f"classes and {num_labels} labels"
-        )
-
-    def forward(self, X: torch.Tensor, y: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, Dict]:
-        try:
-            batch_size = y.shape[0]
-
-            # Get CLS token
-            x = X[:, 0, :]
-
-            # Pass through layers
-            x = self.dropout(x)
-            x = self.dense(x)
-            x = torch.tanh(x)
-            x = self.dropout(x)
-            logits = self.out_proj(x)
-
-            # Reshape for multi-label
-            logits = logits.view(batch_size, self.num_labels, self.num_classes)
-            y = y.view(batch_size, -1)
-
-            loss = self.loss(logits, y.float())
-
-            metrics = {
-                name: metric(logits.cpu(), y.cpu())
-                for name, metric in self.metrics.items()
-            }
-
-            return logits, loss, metrics
-
-        except Exception as e:
-            raise HeadError(f"Multi-label classification forward pass failed: {str(e)}")
 
 
 class RegressionHead(BaseHead):

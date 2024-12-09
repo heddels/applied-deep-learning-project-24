@@ -65,6 +65,9 @@ logging/
 logs/
 *.log
 
+#Old utils for first notebook
+old_utils/
+
 
 # OS specific
 .DS_Store

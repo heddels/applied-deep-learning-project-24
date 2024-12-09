@@ -143,7 +143,6 @@ class Task:
     def __str__(self) -> str:
         return str(self.task_id)
 
-
 class SubTask:
     """Base class for all subtasks.
 
@@ -312,7 +311,6 @@ class SubTask:
         return str(self.id)
 
 
-
 # a[43485:43500]
 class ClassificationSubTask(SubTask):
     """A ClassificationSubTask."""
@@ -391,22 +389,39 @@ class MultiLabelClassificationSubTask(SubTask):
 
     def __init__(self, num_classes=2, num_labels=2, *args, **kwargs):
         """Initialize a MultiLabelClassificationSubTask."""
+        super(MultiLabelClassificationSubTask, self).__init__(*args, **kwargs)
+        self.num_classes = None
         self.num_classes = num_classes
         self.num_labels = num_labels
-        super(MultiLabelClassificationSubTask, self).__init__(*args, **kwargs)
-
+        print(f"MultiClass Subtask {self.id}:\nNum classes: {num_classes}, Num labels: {num_labels}")
 
     def load_data(self) -> Tuple[torch.LongTensor, torch.LongTensor, torch.LongTensor]:
         """Load the data of a MultiLabelClassificationSubTask."""
+        print(f"Loading data for MultiLabelClassificationSubTask {self.id}")
         df = pd.read_csv(self.filename)
+
+        # X = df[self.src_col].tolist()
+        # Y = df[self.tgt_cols_list].values
         X, Y = df[self.src_col], df[self.tgt_cols_list]
-        tokenized_inputs = tokenizer(X.to_list(), padding="max_length", truncation=True,
+
+        print(f"X type: {type(X)}")
+        print(f"Y type: {type(Y)}")
+        print(f"X shape: {len(X)}")
+        print(f"Y shape: {Y.shape}")
+
+        tokenized_inputs = tokenizer(X.tolist(), padding="max_length", truncation=True,
                                      max_length=MAX_LENGTH)
-        X = tokenized_inputs.get("input_ids")
-        attention_masks = tokenized_inputs.get("attention_mask")
+        X = torch.LongTensor(tokenized_inputs.get("input_ids"))
+        attention_masks = torch.LongTensor(tokenized_inputs.get("attention_mask"))
         assert Y.max(axis=0).to_numpy().max() == 1
         Y = Y.to_numpy()
-        return torch.LongTensor(X), torch.LongTensor(Y), torch.LongTensor(attention_masks)
+        Y = torch.LongTensor(Y)
+
+        print(f"X shape: {X.shape}")
+        print(f"Y shape: {Y.shape}")
+        print(f"Attention masks shape: {attention_masks.shape}")
+
+        return X, Y, attention_masks
 
     def __repr__(self):
         """Represent a Multi-label Classification Subtask."""
@@ -494,6 +509,7 @@ class POSSubTask(SubTask):
         In case of POS subtask, the domain size equals the vocab size.
         """
         return 1 / np.log(self.num_classes)
+
 
 # not used in current implementation, but important for testing?
 class MLMSubTask(SubTask):

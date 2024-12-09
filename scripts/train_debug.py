@@ -12,23 +12,26 @@ from media_bias_detection.training.training_utils import Logger, EarlyStoppingMo
 
 from media_bias_detection.data import (
     babe_10,
-    cw_hard_03
+    cw_hard_03,
+    me_too_ma_108,
+    good_news_everyone_42
 )
 
 from media_bias_detection.training.trainer import Trainer
+
 
 import os
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 def main():
-    # Name our experiment
-    EXPERIMENT_NAME = "debug_run"
+    EXPERIMENT_NAME = "experiment_baseline_check"
 
-    # Select just 2 tasks for debugging
+    MODEL_NAME = "baseline_check"
     selected_tasks = [
         babe_10,
         cw_hard_03,
-    ]
+        me_too_ma_108,
+        good_news_everyone_42]
 
     # Process the data for each task
     for task in selected_tasks:
@@ -49,7 +52,7 @@ def main():
         "num_warmup_steps": 10,
         "pretrained_path": None,
         "resurrection": True,
-        "model_name": "debug_model",
+        "model_name": MODEL_NAME,
         "head_specific_lr_dict": head_specific_lr,
         "head_specific_patience_dict": head_specific_patience,
         "head_specific_max_epoch_dict": head_specific_max_epoch,
@@ -63,7 +66,7 @@ def main():
         # Initialize wandb
         wandb.init(
             project=EXPERIMENT_NAME,
-            name="debug_run",
+            name=MODEL_NAME,
             config=config
         )
 
@@ -71,7 +74,7 @@ def main():
         trainer = Trainer(task_list=selected_tasks, **config)
 
         # Run debug training
-        trainer.fit_debug(k=1)  # Just run one iteration
+        trainer.fit_debug(k=2)  # Just run one iteration
 
         # Test evaluation
         trainer.eval(split=Split.TEST)

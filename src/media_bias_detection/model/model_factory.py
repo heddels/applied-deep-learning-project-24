@@ -9,6 +9,7 @@ import torch
 from ..data.dataset import BatchList, BatchListEvalTest
 from ..model.model import Model
 from ..utils.enums import Split
+from ..utils.logger import general_logger
 
 
 def ModelFactory(
@@ -36,32 +37,37 @@ def ModelFactory(
     # Move model to appropriate device
     model.to(model.device)
 
-    # Create dataloaders
-    batch_list_train = BatchList(
-        subtask_list=subtask_list,
-        sub_batch_size=sub_batch_size,
-        split=Split.TRAIN
-    )
+    try:
+        # Create dataloaders with updated classes
+        batch_list_train = BatchList(
+            subtask_list=subtask_list,
+            sub_batch_size=sub_batch_size,
+            split=Split.TRAIN
+        )
 
-    batch_list_dev = BatchList(
-        subtask_list=subtask_list,
-        sub_batch_size=eval_batch_size,
-        split=Split.DEV
-    )
+        batch_list_dev = BatchList(
+            subtask_list=subtask_list,
+            sub_batch_size=eval_batch_size,
+            split=Split.DEV
+        )
 
-    batch_list_eval = BatchListEvalTest(
-        subtask_list=subtask_list,
-        sub_batch_size=sub_batch_size,
-        split=Split.DEV
-    )
+        batch_list_eval = BatchListEvalTest(
+            subtask_list=subtask_list,
+            sub_batch_size=sub_batch_size,
+            split=Split.DEV
+        )
 
-    batch_list_test = BatchListEvalTest(
-        subtask_list=subtask_list,
-        sub_batch_size=sub_batch_size,
-        split=Split.TEST
-    )
+        batch_list_test = BatchListEvalTest(
+            subtask_list=subtask_list,
+            sub_batch_size=sub_batch_size,
+            split=Split.TEST
+        )
 
-    return model, batch_list_train, batch_list_dev, batch_list_eval, batch_list_test
+        return model, batch_list_train, batch_list_dev, batch_list_eval, batch_list_test
+
+    except Exception as e:
+        general_logger.error(f"Failed to create model and dataloaders: {str(e)}")
+        raise
 
 
 def save_head_initializations(model):

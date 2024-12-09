@@ -127,8 +127,8 @@ def get_size(path: Path) -> str:
     size_in_kb = round(os.path.getsize(path) / 1024)
     return f"~ {size_in_kb} KB"
 
-#from here one directly taken from magpie repo utils
-"""This module contains utils."""
+#from here one directly taken from magpie repo old_utils
+"""This module contains old_utils."""
 @ensure_annotations
 def integer_formatter(i):
     """Format integers.
