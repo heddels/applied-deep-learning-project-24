@@ -188,6 +188,35 @@ class Tracker:
         except Exception as e:
             raise MetricError(f"Failed to initialize losses: {str(e)}")
 
+    def __str__(self) -> str:
+        """Return string representation of current training state."""
+        try:
+            # Get both training loss and metrics
+            train_loss = self.combined_losses[Split.TRAIN].mean_last_k(1)
+            metrics_str = []
+
+            # Add training loss if available
+            if not np.isnan(train_loss):
+                metrics_str.append(f"Loss: {train_loss:.4f}")
+
+            # Add first available metric if exists
+            # This assumes your metrics dictionary structure from _init_metrics
+            for st_id, st_metrics in self.metrics[Split.TRAIN].items():
+                for metric_name, metric_meter in st_metrics.items():
+                    metric_val = metric_meter.mean_last_k(1)
+                    if not np.isnan(metric_val):
+                        metrics_str.append(f"{metric_name}: {metric_val:.4f}")
+                    break  # Just take first metric for conciseness
+                break  # Just take first subtask for conciseness
+
+            if metrics_str:
+                return " | ".join(metrics_str)
+            return "Initializing..."
+
+        except Exception as e:
+            general_logger.warning(f"Failed to create string representation: {str(e)}")
+            return "No metrics available"
+
     def update_metric(
             self,
             split: Split,
@@ -309,6 +338,11 @@ class Tracker:
             out: Dict[str, float] = additional_payload or {}
 
             for split in splits:
+                # Check if we have any values before trying to log
+                if not any(any(m.values for m in d.values())
+                           for d in self.metrics[split].values()):
+                    general_logger.warning(f"No metrics recorded for split {split}, skipping logging")
+                    continue
                 # For training and validation, log last values
                 if split in [Split.DEV, Split.TRAIN]:
                     # Log metrics

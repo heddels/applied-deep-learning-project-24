@@ -1,4 +1,8 @@
+"""Script for executing the pre-finetuning on the subtasks excluding BABE."""
+from pathlib import Path
+
 import wandb
+from click import clear
 
 # Import configuration and utilities
 from media_bias_detection.utils.enums import Split, AggregationMethod, LossScaling
@@ -10,26 +14,26 @@ from media_bias_detection.config.config import (
 )
 from media_bias_detection.training.training_utils import Logger, EarlyStoppingMode
 
-from media_bias_detection.data import test_tasks, test_subtasks
+from media_bias_detection.data import all_tasks, babe_10
 
 from media_bias_detection.training.trainer import Trainer
 
 import os
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
+
 def main():
-    EXPERIMENT_NAME = "experiment_debug_check"
+    EXPERIMENT_NAME = "pre_finetunging"
+    MODEL_NAME = "pre_finetuned_model"
 
-    MODEL_NAME = "debug_check"
-    selected_tasks = test_tasks
-    print(selected_tasks, test_subtasks)
 
-    # Process the data for each task
-    for task in selected_tasks:
-        for subtask in task.subtasks_list:
-            subtask.process()
+    tasks = all_tasks
+    all_tasks.remove(babe_10)
 
-    # Configure training parameters
+    for t in tasks:
+        for st in t.subtasks_list:
+            st.process()
+
     config = {
         "sub_batch_size": 32,
         "eval_batch_size": 128,
@@ -37,7 +41,7 @@ def main():
         "dropout_prob": 0.1,
         "hidden_dimension": 768,
         "input_dimension": 768,
-        "aggregation_method": AggregationMethod.MEAN,
+        "aggregation_method": AggregationMethod.PCGRAD,
         "early_stopping_mode": EarlyStoppingMode.HEADS,
         "loss_scaling": LossScaling.STATIC,
         "num_warmup_steps": 10,
@@ -50,36 +54,38 @@ def main():
         "logger": Logger(EXPERIMENT_NAME),
     }
 
-    # Set random seed for reproducibility
-    set_random_seed()  # default is 321
-
+    set_random_seed()
     try:
-        # Initialize wandb
-        wandb.init(
-            project=EXPERIMENT_NAME,
-            name=MODEL_NAME,
-            config=config
-        )
-
-        # Create trainer
-        trainer = Trainer(task_list=selected_tasks, **config)
-
-        # Run debug training
-        trainer.fit_debug(k=1)  # Just run one iteration
-
-        # Test evaluation
-        trainer.eval(split=Split.TEST)
-
-        # Save the model
+        wandb.init(project=EXPERIMENT_NAME, name="all_tasks_pretraining_pc")
+        trainer = Trainer(task_list=tasks, **config)
+        trainer.fit()
         trainer.save_model()
 
+    except KeyboardInterrupt:
+
+        print("\nTraining interrupted! Saving checkpoint...")
+
+        # Save with simpler checkpoint system
+
+        trainer.checkpoint_manager.save_checkpoint(
+
+            model=trainer.model,
+
+            step=-1,  # Special flag for interrupted training
+
+            metrics={'interrupted': True}
+
+        )
+
+        print("Checkpoint saved!")
+
     except Exception as e:
-        print(f"Debug training failed with error: {str(e)}")
+        print(f"Pre-Finetuning failed with error: {str(e)}")
         raise e
 
     finally:
-        # Always make sure to close wandb
-       wandb.finish()
+        wandb.finish()
+        print("Pre-Finetuning completed successfully!")
 
 if __name__ == "__main__":
     main()

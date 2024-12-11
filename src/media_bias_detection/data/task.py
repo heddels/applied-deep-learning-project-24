@@ -161,7 +161,6 @@ class SubTask:
             filename: str,
             src_col: str = "text",
             tgt_cols_list: List[str] = ["label"],
-            cache_dir: Optional[str] = None
     ):
         if type(self) == SubTask:
             raise RuntimeError("Abstract class <SubTask> must not be instantiated.")
@@ -171,7 +170,6 @@ class SubTask:
         self.src_col = src_col
         self.tgt_cols_list = tgt_cols_list
         self.filename = Path(os.path.join("datasets", filename))
-        self.cache_dir = Path(cache_dir) if cache_dir else None
 
         # Data attributes
         self.attention_masks: Optional[Dict[Split, torch.Tensor]] = None
@@ -185,7 +183,7 @@ class SubTask:
             f"using file {self.filename}"
         )
 
-    def process(self, force_download: bool = False) -> None:
+    def process(self, force_download: bool = False, debug: bool = False ) -> None:
         """Process and split the data.
 
         Args:
@@ -195,13 +193,8 @@ class SubTask:
             DataProcessingError: If data processing fails
         """
         try:
-            # Check cache first
-            if self.cache_dir and not force_download:
-                if self._load_from_cache():
-                    return
-
             general_logger.info(f"Processing SubTask {self.id}")
-            X, Y, attention_masks = self.load_data()
+            X, Y, attention_masks = self.load_data(debug=debug)
 
             # Validate data
             if not (len(X) == len(Y) == len(attention_masks)):
@@ -223,7 +216,6 @@ class SubTask:
                       Split.TEST: Y[dev_split:]}
 
             self.create_class_weights()
-            self._save_to_cache()
 
             self.processed = True
             general_logger.info(
@@ -235,46 +227,6 @@ class SubTask:
 
         except Exception as e:
             raise DataProcessingError(f"Failed to process subtask {self.id}: {str(e)}")
-
-    def _load_from_cache(self) -> bool:
-        """Try to load processed data from cache."""
-        if not self.cache_dir:
-            return False
-
-        cache_file = self.cache_dir / f"subtask_{self.id}.pt"
-        if cache_file.exists():
-            try:
-                cached_data = torch.load(cache_file)
-                self.X = cached_data['X']
-                self.Y = cached_data['Y']
-                self.attention_masks = cached_data['attention_masks']
-                self.class_weights = cached_data.get('class_weights')
-                self.processed = True
-                general_logger.info(f"Loaded cached data for SubTask {self.id}")
-                return True
-            except Exception as e:
-                general_logger.warning(f"Failed to load cache for SubTask {self.id}: {e}")
-                return False
-        return False
-
-    def _save_to_cache(self) -> None:
-        """Save processed data to cache."""
-        if not self.cache_dir:
-            return
-
-        self.cache_dir.mkdir(parents=True, exist_ok=True)
-        cache_file = self.cache_dir / f"subtask_{self.id}.pt"
-
-        try:
-            torch.save({
-                'X': self.X,
-                'Y': self.Y,
-                'attention_masks': self.attention_masks,
-                'class_weights': self.class_weights
-            }, cache_file)
-            general_logger.info(f"Saved cache for SubTask {self.id}")
-        except Exception as e:
-            general_logger.warning(f"Failed to save cache for SubTask {self.id}: {e}")
 
     # Abstract methods
     def load_data(self) -> Tuple:
@@ -320,9 +272,13 @@ class ClassificationSubTask(SubTask):
         super(ClassificationSubTask, self).__init__(*args, **kwargs)
         self.num_classes = num_classes
 
-    def load_data(self) -> Tuple[torch.LongTensor, torch.LongTensor, torch.LongTensor]:
+    def load_data(self, debug: bool = False) -> Tuple[torch.LongTensor, torch.LongTensor, torch.LongTensor]:
         """Load the data of a ClassificationSubTask."""
         df = pd.read_csv(self.filename)
+        if debug:
+            # Take only first 100 samples for debugging
+            df = df.head(100)
+            general_logger.info(f"Debug mode: Using {len(df)} samples for subtask {self.id}")
 
         X, Y = df[self.src_col], df[self.tgt_cols_list]
         tokenized_inputs = tokenizer(X.to_list(), padding="max_length", truncation=True,
@@ -353,37 +309,6 @@ class ClassificationSubTask(SubTask):
         return 1 / np.log(self.num_classes)
 
 
-# in current implementation, the regression subtask is not used
-class RegressionSubTask(SubTask):
-    """A RegressionSubTask."""
-
-    def __init__(self, *args, **kwargs):
-        """Initialize a RegressionSubTask."""
-        super(RegressionSubTask, self).__init__(*args, **kwargs)
-
-    def load_data(self) -> Tuple[torch.LongTensor, torch.FloatTensor, torch.LongTensor]:
-        """Load the data of a RegressionSubTask."""
-        df = pd.read_csv(self.filename)
-        X, Y = df[self.src_col], df[self.tgt_cols_list]
-        tokenized_inputs = tokenizer(X.to_list(), padding="max_length", truncation=True,
-                                     max_length=MAX_LENGTH)
-        X = tokenized_inputs.get("input_ids")
-        attention_masks = tokenized_inputs.get("attention_mask")
-        Y = (((Y - Y.min()) / (Y.max() - Y.min())).to_numpy()).astype("float32")  # scale from 0 to 1
-        return torch.LongTensor(X), torch.FloatTensor(Y), torch.LongTensor(attention_masks)
-
-    def __repr__(self):
-        """Represent a Regression Subtask."""
-        return "Regression"
-
-    def get_scaling_weight(self):
-        """Get the scaling weight of a Regression Subtask.
-
-        As of now, this scaling weight is a simple scalar and is a mere heuristic-based approximation (ie. we eyeballed it).
-        """
-        return REGRESSION_SCALAR
-
-
 class MultiLabelClassificationSubTask(SubTask):
     """A MultiLabelClassificationSubTask."""
 
@@ -395,19 +320,18 @@ class MultiLabelClassificationSubTask(SubTask):
         self.num_labels = num_labels
         print(f"MultiClass Subtask {self.id}:\nNum classes: {num_classes}, Num labels: {num_labels}")
 
-    def load_data(self) -> Tuple[torch.LongTensor, torch.LongTensor, torch.LongTensor]:
+    def load_data(self, debug: bool = False) -> Tuple[torch.LongTensor, torch.LongTensor, torch.LongTensor]:
         """Load the data of a MultiLabelClassificationSubTask."""
         print(f"Loading data for MultiLabelClassificationSubTask {self.id}")
         df = pd.read_csv(self.filename)
+        if debug:
+            # Take only first 100 samples for debugging
+            df = df.head(100)
+            general_logger.info(f"Debug mode: Using {len(df)} samples for subtask {self.id}")
 
         # X = df[self.src_col].tolist()
         # Y = df[self.tgt_cols_list].values
         X, Y = df[self.src_col], df[self.tgt_cols_list]
-
-        print(f"X type: {type(X)}")
-        print(f"Y type: {type(Y)}")
-        print(f"X shape: {len(X)}")
-        print(f"Y shape: {Y.shape}")
 
         tokenized_inputs = tokenizer(X.tolist(), padding="max_length", truncation=True,
                                      max_length=MAX_LENGTH)
@@ -416,10 +340,6 @@ class MultiLabelClassificationSubTask(SubTask):
         assert Y.max(axis=0).to_numpy().max() == 1
         Y = Y.to_numpy()
         Y = torch.LongTensor(Y)
-
-        print(f"X shape: {X.shape}")
-        print(f"Y shape: {Y.shape}")
-        print(f"Attention masks shape: {attention_masks.shape}")
 
         return X, Y, attention_masks
 
@@ -456,9 +376,13 @@ class POSSubTask(SubTask):
         assert len(tgt_cols_list) == 1
         super(POSSubTask, self).__init__(tgt_cols_list=tgt_cols_list, *args, **kwargs)
 
-    def load_data(self) -> Tuple[torch.LongTensor, torch.LongTensor, torch.LongTensor]:
+    def load_data(self, debug: bool = False) -> Tuple[torch.LongTensor, torch.LongTensor, torch.LongTensor]:
         """Load the data of a POSSubTask."""
         df = pd.read_csv(self.filename)
+        if debug:
+            # Take only first 100 samples for debugging
+            df = df.head(100)
+            general_logger.info(f"Debug mode: Using {len(df)} samples for subtask {self.id}")
 
         df[self.tgt_cols_list] = df[self.tgt_cols_list].fillna("")
         mask = df.apply(
@@ -546,3 +470,33 @@ class MLMSubTask(SubTask):
     def get_scaling_weight(self):
         """Get the weights for imbalanced classes."""
         return 1 / np.log(len(tokenizer))
+
+# in current implementation, the regression subtask is not used
+class RegressionSubTask(SubTask):
+    """A RegressionSubTask."""
+
+    def __init__(self, *args, **kwargs):
+        """Initialize a RegressionSubTask."""
+        super(RegressionSubTask, self).__init__(*args, **kwargs)
+
+    def load_data(self) -> Tuple[torch.LongTensor, torch.FloatTensor, torch.LongTensor]:
+        """Load the data of a RegressionSubTask."""
+        df = pd.read_csv(self.filename)
+        X, Y = df[self.src_col], df[self.tgt_cols_list]
+        tokenized_inputs = tokenizer(X.to_list(), padding="max_length", truncation=True,
+                                     max_length=MAX_LENGTH)
+        X = tokenized_inputs.get("input_ids")
+        attention_masks = tokenized_inputs.get("attention_mask")
+        Y = (((Y - Y.min()) / (Y.max() - Y.min())).to_numpy()).astype("float32")  # scale from 0 to 1
+        return torch.LongTensor(X), torch.FloatTensor(Y), torch.LongTensor(attention_masks)
+
+    def __repr__(self):
+        """Represent a Regression Subtask."""
+        return "Regression"
+
+    def get_scaling_weight(self):
+        """Get the scaling weight of a Regression Subtask.
+
+        As of now, this scaling weight is a simple scalar and is a mere heuristic-based approximation (ie. we eyeballed it).
+        """
+        return REGRESSION_SCALAR

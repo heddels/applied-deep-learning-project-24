@@ -47,21 +47,18 @@ class SubTaskDataset(Dataset):
         subtask: The subtask this dataset is for
         observations: List of indices into the data
         _counter: Internal counter for iteration
-        cache: Optional cache for frequently accessed items
     """
 
     def __init__(
             self,
             subtask: SubTask,
             split: Split,
-            cache_size: int = 100
     ) -> None:
         """Initialize the dataset.
 
         Args:
             subtask: SubTask instance containing the data
             split: Which data split to use
-            cache_size: Number of items to keep in memory cache
         """
         general_logger.info(f"Initializing dataset for subtask {subtask.id} with split {split}")
 
@@ -72,8 +69,6 @@ class SubTaskDataset(Dataset):
         self.subtask = subtask
         self.observations: List[int] = []
         self._counter: int = 0
-        self._cache: Dict[int, BatchData] = {}
-        self._cache_size = cache_size
         self._reset()
 
     def __len__(self) -> int:
@@ -98,11 +93,6 @@ class SubTaskDataset(Dataset):
 
             i = self.observations[self._counter]
 
-            # Check cache first
-            if i in self._cache:
-                self._counter += 1
-                return self._cache[i]
-
             # Load and process item
             x = self.subtask.get_X(split=self.split)[i]
             masks = self.subtask.get_att_mask(split=self.split)[i]
@@ -114,12 +104,6 @@ class SubTaskDataset(Dataset):
                 labels=y,
                 subtask_id=self.subtask.id
             )
-
-            # Update cache
-            if len(self._cache) >= self._cache_size:
-                # Remove oldest item
-                del self._cache[next(iter(self._cache))]
-            self._cache[i] = batch_data
 
             self._counter += 1
             return x, masks, y, self.subtask.id
@@ -135,7 +119,6 @@ class SubTaskDataset(Dataset):
         set_random_seed()
         np.random.shuffle(self.observations)  # Not a real 'reshuffling' as it will always arrange same.
         self._counter = 0
-        self._cache.clear()
 
 
 class BatchList:

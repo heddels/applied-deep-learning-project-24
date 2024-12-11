@@ -23,6 +23,7 @@ from ..model.model_factory import ModelFactory
 from ..utils.enums import Split, LossScaling
 from ..utils.logger import general_logger
 from .metrics import Tracker
+from .checkpoint_system import ModelCheckpoint
 from .training_utils import Logger, EarlyStopper, EarlyStoppingMode
 
 from ..model.gradient import GradientAggregator, AggregationMethod
@@ -130,7 +131,7 @@ class Trainer:
             # Initialize tracking components
             self.tracker = Tracker(heads=self.model.heads, logger=logger)
             self.GA = GradientAggregator(aggregation_method=aggregation_method)
-            self.progress_bar = tqdm(range(len(self.model.heads)))
+            self.progress_bar = tqdm(total=len(self.model.heads), desc="Training Progress")
             self.model_name = model_name
             self.scaling_weights = {str(st.id): st.get_scaling_weight() for t in task_list for st in t.subtasks_list}
             self.MAX_NUMBER_OF_STEPS = MAX_NUMBER_OF_STEPS
@@ -139,6 +140,13 @@ class Trainer:
             # Memory tracking
             self._last_memory_check = time.time()
             self._memory_check_interval = 60  # seconds
+
+            #checkpoint initialization
+            self.checkpoint_manager = ModelCheckpoint(
+                save_dir=f"checkpoints/{model_name}",
+                save_freq=10,
+                monitor='combined_dev_loss',  # Monitor validation loss
+            )
 
             general_logger.info(
                 f"Trainer initialized successfully on {self.device}"
@@ -174,6 +182,7 @@ class Trainer:
         @return: A dictionary with additional payload containing the conflicting gradients ratio.
         """
         try:
+            general_logger.info(f"Optimizing task {st_id}, alive: {self.task_alive_flags[st_id]}")
             additional_payload = {}
 
             # Check if we have dev metrics recorded
@@ -203,8 +212,11 @@ class Trainer:
                 if should_stop_now and self.task_alive_flags[st_id]:
                     general_logger.info(f"Subtask {st_id} is now DEAD.")
                     self.eval_st(split=Split.EVAL, st_id=st_id)
-                    self.tracker.log(splits=[Split.EVAL], additional_payload={st_id + "_STOPPED": 0})
-                    self.progress_bar.update()
+                    if self.tracker.losses[Split.EVAL][st_id].values:
+                        self.tracker.log(splits=[Split.EVAL], additional_payload={st_id + "_STOPPED": 0})
+                        self.progress_bar.update()
+                    else:
+                        general_logger.warning(f"No evaluation metrics available for subtask {st_id}")
 
                 elif should_resurrect_now and not self.task_zombie_flags[st_id]:
                     general_logger.info(f"Subtask {st_id} is now ZOMBIE.")
@@ -403,7 +415,8 @@ class Trainer:
     def fit(self):
         """Train the model."""
         try:
-            general_logger.info("Starting training")
+            general_logger.info(f"Starting training with MAX_STEPS: {self.MAX_NUMBER_OF_STEPS}")
+            general_logger.info(f"Initial task states: {self.task_alive_flags}")
             step = 0
 
             while step < self.MAX_NUMBER_OF_STEPS:
@@ -416,18 +429,36 @@ class Trainer:
 
                 batch = next(self.batch_lists[Split.TRAIN])
                 train_payload = self.handle_batch(batch=batch, split=Split.TRAIN)
+                splits_to_log = [Split.TRAIN]
 
                 if step % 3 == 0:
                     batch = next(self.batch_lists[Split.DEV])
                     dev_payload = self.handle_batch(batch=batch, split=Split.DEV)
                     train_payload.update(dev_payload)
+                    splits_to_log.append(Split.DEV)
 
                 self._update_progress()
                 self.tracker.log(
-                    splits=[Split.TRAIN, Split.DEV],
+                    splits=splits_to_log,
                     additional_payload=train_payload
                 )
+                # log every 10 steps
+                if step % 10 == 0:
+                    general_logger.info(f"We are ar at step {step}")
 
+                # Add checkpoint saving every 10 steps
+                if step % 10 == 0:  # Only save every 10 steps
+                    metrics = {
+                        'combined_dev_loss': self.tracker.combined_losses[Split.DEV].mean_last_k(1),
+                        'step': step
+                    }
+
+                    self.checkpoint_manager.save_checkpoint(
+                        model=self.model,
+                        step=step,
+                        metrics=metrics
+                    )
+                    general_logger.info(f"Saved checkpoint at step {step}")
                 # Periodic memory optimization
                 if step % 100 == 0:
                     self._optimize_memory()

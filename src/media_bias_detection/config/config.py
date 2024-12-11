@@ -10,7 +10,6 @@ load_dotenv()
 # WANDB
 WANDB_API_KEY = os.getenv("WANDB_API_KEY")
 
-
 # task specific configs
 
 dataset_id_to_dataset_name = {
@@ -27,7 +26,6 @@ dataset_id_to_dataset_name = {
 
 }
 
-
 class TaskFamilies(Enum):
     """Task Families."""
 
@@ -42,7 +40,6 @@ class TaskFamilies(Enum):
     EMOTIONALITY = "Emotionality"
     STANCE_DETECTION = "Stance Detection"
 
-
 dataset_id_to_family = {
 3: TaskFamilies.SUBJECTIVITY, #new dataset the old for category subjectivity wrongly assigned there
     10: TaskFamilies.MEDIA_BIAS,
@@ -55,7 +52,7 @@ dataset_id_to_family = {
     128: TaskFamilies.STANCE_DETECTION,
 }
 
-MAX_NUMBER_OF_STEPS = 1000
+MAX_NUMBER_OF_STEPS = 50 # changed from 1000 to 100, 100 for prefinetuning and 50 for finetuning
 
 # Task-configs
 MAX_LENGTH = 128
@@ -69,24 +66,6 @@ REGRESSION_SCALAR = 2.5
 # Split ratio for train/ dev/ test
 TRAIN_RATIO, DEV_RATIO, TEST_RATIO = 0.8, 0.1, 0.1
 
-# plotting configuration
-# TODO find the correct width from the latex document
-width, fraction = 570, 1
-fig_width_pt = width * fraction
-# Convert from pt to inches
-inches_per_pt = 1 / 72.27
-# Golden ratio to set aesthetic figure height
-# https://disq.us/p/2940ij3
-golden_ratio = (5 ** 0.5 - 1) / 2
-# Figure width in inches
-fig_width_in = fig_width_pt * inches_per_pt
-# Figure height in inches
-fig_height_in = fig_width_in * golden_ratio
-
-FIGSIZE = (fig_width_in, fig_height_in)
-
-TABLE_CONFIG = {"hrules": True, "multicol_align": "l", "multirow_align": "t", "clines": "skip-last;index"}
-
 # hyperparameter ranges
 hyper_param_dict = {
     "lr": {"values": [5e-5, 4e-5, 3e-5, 2e-5, 1e-4]},
@@ -95,7 +74,7 @@ hyper_param_dict = {
 }
 
 
-# TRAINING parameters - keeping only relevant task IDs
+# TRAINING parameters - keeping only chosen task IDs
 head_specific_lr = {
     "300001": 0.0001,
     "10001": 3e-05,

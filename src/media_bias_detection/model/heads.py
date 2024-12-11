@@ -45,8 +45,6 @@ def HeadFactory(st: SubTask, *args, **kwargs) -> 'BaseHead':
     """
     try:
         if isinstance(st, ClassificationSubTask):
-            print(f"Creating ClassificationHead for subtask {st.id}")
-            print(f"num_classes: {st.num_classes}")
             return ClassificationHead(
                 num_classes=st.num_classes,
                 class_weights=st.class_weights,
@@ -54,8 +52,6 @@ def HeadFactory(st: SubTask, *args, **kwargs) -> 'BaseHead':
                 **kwargs
             )
         elif isinstance(st, MultiLabelClassificationSubTask):
-            print(f"Creating MultiLabelClassificationHead for subtask {st.id}")
-            print(f"num_classes: {st.num_classes}, num_labels: {st.num_labels}")
             return ClassificationHead(
                 num_classes=st.num_classes,
                 num_labels=st.num_labels if st.num_labels is not None else 2,
@@ -115,9 +111,6 @@ class ClassificationHead(BaseHead):
             class_weights: Optional[torch.Tensor] = None
     ):
         super().__init__()
-        print(f"Initializing ClassificationHead")
-        print(f"num_classes: {num_classes}")
-        print(f"num_labels: {num_labels}")
 
         # Common layers
         self.dense = nn.Linear(input_dimension, hidden_dimension)
@@ -130,7 +123,6 @@ class ClassificationHead(BaseHead):
 
         # Use CrossEntropyLoss for both cases
         self.loss = nn.CrossEntropyLoss(weight=class_weights)
-        print(f"Initializing ClassificationHead with {num_labels} labels")
         # Set up metrics based on task type
         if num_labels > 1:  # Multi-label case
             self.metrics = {
@@ -162,9 +154,6 @@ class ClassificationHead(BaseHead):
     def forward(self, X: torch.Tensor, y: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, Dict]:
         try:
             batch_size = y.shape[0]
-            print(f"Batch size: {batch_size}")
-            print(f"X shape: {X.shape}")
-            print(f"y shape: {y.shape}")
 
             # Get CLS token representation
             x = X[:, 0, :]  # take <s> token (equiv. to [CLS])
@@ -178,7 +167,6 @@ class ClassificationHead(BaseHead):
 
             # Compute loss
             loss = self.loss(logits.view(-1, self.num_classes), y.view(-1))
-            print(f"Logits shape: {logits.shape}")
 
             # Reshape logits based on task type
             if self.num_labels > 1:  # Multi-label case

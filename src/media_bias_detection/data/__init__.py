@@ -116,6 +116,11 @@ gwsd_128,
 # Get all subtasks
 all_subtasks = list(itertools.chain.from_iterable(t.subtasks_list for t in all_tasks))
 
+# test_task object  list for debugging
+test_tasks = [cw_hard_03, me_too_ma_108, good_news_everyone_42]
+
+test_subtasks = list(itertools.chain.from_iterable(t.subtasks_list for t in test_tasks))
+
 # Task families
 media_bias = [babe_10]
 subjective_bias = [cw_hard_03]

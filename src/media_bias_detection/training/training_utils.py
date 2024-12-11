@@ -24,7 +24,7 @@ class Logger:
     """Logger to keep track of metrics, losses and artifacts."""
 
     def __init__(self, experiment_name: str):
-        PATH = "logging/" + experiment_name
+        PATH = "metric_logging/" + experiment_name
         os.makedirs(PATH, exist_ok=True)
 
         self.experiment_logfilename = PATH + "/train_data.log"
