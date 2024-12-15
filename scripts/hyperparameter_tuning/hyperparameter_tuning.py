@@ -1,5 +1,5 @@
 """This module can be executed to run a hyperparameter training_baseline job for multiple tasks, each task alone.
-It is taken from the scripts/hyperparameter_tuning/greedy_search_for_hyperparameters.py file. of the MAGPIE repository."""
+It is taken from the scripts/hyperparameter_tuning/hyperparameter_tuning.py file. of the MAGPIE repository."""
 
 import wandb
 from media_bias_detection.config.config import (
@@ -36,7 +36,7 @@ def train_wrapper():
         "num_warmup_steps": wandb.config.num_warmup_steps,
         "dropout_prob": wandb.config.dropout_prob,
         # Fixed parameters
-        "max_steps": MAX_NUMBER_OF_STEPS,
+        "max_steps": 500,
         "eval_batch_size": 128,
         "initial_lr": 5e-5,
         "hidden_dimension": 768,

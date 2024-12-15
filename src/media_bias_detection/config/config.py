@@ -52,7 +52,7 @@ dataset_id_to_family = {
     128: TaskFamilies.STANCE_DETECTION,
 }
 
-MAX_NUMBER_OF_STEPS = 200 # changed from 1000 to 100 for prefinetuning and 50 for finetuning
+MAX_NUMBER_OF_STEPS = 200 # changed from 1000 to 100 for prefinetuning and 50 for finetuning for baseline
 
 # Task-configs
 MAX_LENGTH = 128
@@ -63,7 +63,7 @@ RANDOM_SEED = 321
 # Split ratio for train/ dev/ test
 TRAIN_RATIO, DEV_RATIO, TEST_RATIO = 0.8, 0.1, 0.1
 
-# hyperparameter ranges
+# hyperparameter ranges for my hyperparameter tuning
 hyper_param_dict = {
     "dropout_prob": {"values": [0.1, 0.2, 0.3]},
     "sub_batch_size": {"values": [16, 32, 64]},

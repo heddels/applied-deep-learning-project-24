@@ -62,6 +62,7 @@ def main():
         trainer = Trainer(task_list=tasks, **config)
         trainer.fit()
         trainer.save_model()
+        print("Pre-Finetuning completed successfully!")
 
     except KeyboardInterrupt:
 
@@ -87,7 +88,6 @@ def main():
 
     finally:
         wandb.finish()
-        print("Pre-Finetuning completed successfully!")
 
 if __name__ == "__main__":
     main()

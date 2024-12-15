@@ -90,7 +90,29 @@ for the detection of media bias in news articles.** In Information for a better 
 # Hacking Phase Documentation
 
 ## Actual Time Tracking
- ....
+1. **Initial Setup** (9h)
+   - Environment setup and MLFlow configuration with MLOps tutorial (6h)
+   - Code understanding and repository analysis (3h)
+   
+
+2. **First Implementation Attempt** (30h)
+   - Data pipeline development (4h)
+   - Baseline model notebook (16h)
+   - Code modularization (10h)
+   
+
+3. **Project Reset and Main Implementation** (29h)
+   - New architecture setup (13h)
+   - Training pipeline debugging (11h)
+   - Baseline model training (4h)
+   - Hyperparameter optimization setup (6h)
+   
+
+4. **Running Experiments** (~32h compute time)
+   - Pre-finetuning run for baseline (8h)
+   - Finetuning across 30 seeds for baseline (12h)
+   - Hyperparameter optimization (XXh)
+
 
 ## Error Metric Specification
 The error metric for this project is the F1 score, which is the harmonic mean of precision and recall.
@@ -100,67 +122,127 @@ The target value however is not the one achieved by MAGPIE, since I chose a simp
 Therefore, the target I take is the one from the other MTL Approach by Spinde et al. (2022), which is 0.78 for the MTL.
 **Insert picture of the table of the metrics here**
 
-## New Organization of Source Code
+
+## Final Model Architecture
+The final model architecture is a simplified version of the MAGPIE model, using DistilBERT as the backbone and a
+multitask learning setup with xxxxx tasks. The model consists of the following components:
+
+- **Data processing and handling**: _describe how it works_
+- **Model architecture components**: _describe how it works_
+    DistilBERT Backbone (backbone.py)
+   
+    Shared encoder that processes text inputs into contextual embeddings
+    Pre-trained model that's fine-tuned during training
+    Takes tokenized text and outputs hidden states of dimension 768
+    Task-Specific Heads (heads.py)
+      
+    Different types of classification heads:
+      
+    ClassificationHead: Binary/multiclass classification
+    TokenClassificationHead: Token-level predictions
+    MultiLabelClassificationHead: Multiple label prediction
+      
+    Each head contains:
+      
+    Dense layers for task-specific transformations
+    Task-specific loss functions
+    Metric tracking (F1 score, accuracy)
+      
+    Gradient Management (gradient.py)
+      
+    Handles potential conflicts between different tasks during training
+    Implements different gradient aggregation methods:
+      
+    Mean: Simple averaging of gradients
+    PCGrad: Projects conflicting gradients
+    PCGrad-Online: Online version of gradient projection
+- **Training components**: _describe how it works_
+   
+   Trainer Components (trainer.py) 
+   Manages two optimization loops:
+   Backbone optimization with shared parameters
+   Head-specific optimization for each task
+   
+   Implements early stopping with:
+   Task-specific patience
+   "Zombie" resurrection system (tasks can be revived)
+   
+   Batch handling:
+   Processes batches from different tasks
+   Accumulates gradients appropriately
+   Applies loss scaling
+- **Source-specific utilities**: _describe how it works_
+
+
+## Repository Structure
 ```
-pproject_root/
+project_root/
 │
 ├── src/                               # Core source code
-│   ├── __init__.py
 │   │
 │   ├── data/                         # Data processing and handling
-│   │   ├── __init__.py              
-│   │   ├── task.py                   # Task and Subtask classes for MTL settings
+│   │   ├── __init__.py               # Initialization of all data tasks
+│   │   ├── task.py                   # Task and Subtask classes 
 │   │   ├── dataset.py                # Dataset classes for data loading, preprocessing
 │   │
 │   ├── model/                        # Model architecture components
-│   │   ├── __init__.py
 │   │   ├── model.py                  # Main MTL model combining backbone and heads
-│   │   ├── heads.py                  # Task-specific model heads (classification etc.)
+│   │   ├── heads.py                  # Task-specific model heads for different subtasks
 │   │   ├── backbone.py               # Shared DistilBERT backbone
 │   │   └── gradient.py               # Gradient management for MTL
 │   │
 │   ├── training/                     # Training components
-│   │   ├── __init__.py
 │   │   ├── trainer.py                # Main training loop and logic
 │   │   ├── checkpoint.py             # Model checkpointing
 │   │   ├── logger.py                 # Training logging to wandb
 │   │   ├── metrics.py                # Metrics tracking and computation
 │   │   └── training_utils.py         # Training helper functions
 │   │
+│   ├── tokenizer.py                  # Tokenizer initialization
 │   └── utils/                        # Source-specific utilities
-│       ├── __init__.py
-│       └── tokenizer.py              # Tokenizer initialization
-│
-├── utils/                            # Global utilities
-│   ├── __init__.py
-│   ├── common.py                     # Common helper functions
-│   ├── enums.py                      # Enumerations for model settings
-│   ├── logger.py                     # Global logging setup
-│   └── transformer.py                # Transformer model utilities
-│
-├── config/                           # Configuration settings
-│   ├── __init__.py
-│   └── config.py                     # Model and training parameters
+│       ├── common.py                 # Common helper functions
+│       ├── enums.py                  # Enumerations for model settings
+│       └── logger.py                 # Global logging setup       
 │
 ├── research/                         # Research and experiments
-│   └── test.ipynb                        # Testing notebook for model components
-
+│   ├── magpie_repo_test.ipynb        # Testing notebook for model components with MAGPIE structure
+│   └── updated_code_test.ipynb       # Testing notebook for updated model components
+│
+└── scripts/                          # Scripts for running experiments
+    │
+    ├── debugging/                    # Debugging scripts for testing the pipeline
+    │   ├── train_debug.py            # Debugging script for single step
+    │   └── full_train_debug.py       # Debugging script for several training steps
+    │
+    ├── training_baseline/
+    │   ├── pre_finetune.py           # Pre-finetuning script for baseline model
+    │   └── finetune.py               # Finetuning script for baseline model for 30 seeds
+    │   
+    └── hyperparameter_tuning/        # Hyperparameter optimization scripts
+        ├──train_prefinetuning_v2.py  # Script for pre-finetuning with more steps
+        └── hyperparameter_tuning.py  # Main script for hyperparameter optimization for finetuning
+   
 ```
+- Datasets file und logging noch hinzufügen
+- datasets auch für git
+- 
+- 
 
-
-## Final Model Architecture
-The final model architecture is a simplified version of the MAGPIE model, using DistilBERT as the backbone and a
-multitask learning setup with xxxxx
 
 ## Training and Evaluation
+
 The process of training the model is as follows:
+1. Data Initialization (preprocessed from repository)
+
 1. Train a baseline model with the hyperparameter setting of the MAGPIE paper:
    - pre-finetune the DistilBERT Model on all datasets except for the BABE dataset
    - finetune the model on the BABE dataset and compare over 30 random seeds
-2. Perform hyperparameter tuning to find the optimal hyperparameters for the model
-   - Increase the number of steps for pre-finetuning (from 100 to 500)
-   - Increase the number of steps for finetuning (from 50 to 200)
-   - 
+   
+2. Perform hyperparameter tuning to find the optimal hyperparameters for the model (see next chapter for detail)
+
+   
+Description of the different scripts.
+
 ## Results
 
 ### Baseline Model
@@ -188,44 +270,12 @@ Since in the MAGPIE repository, they already did a hyperparameter tuning for the
 - max epochs and
 - early stopping patience,
 I will use the hyperparameters from the MAGPIE paper and increase 
-the number of max_steps to 500 in comparison to my baseline, as well as the warmup steps to 10% of the max_steps.
+the number of max_steps to 500 in comparison to my baseline, 
+as well as the warmup steps to 10% of the max_steps.
 
-Next to that I will to a hyperparameter optimization with a random search with the following parameters:
+For the finetuning step, I will to a hyperparameter optimization with a random search
+for the following parameters:
 - Dropout rate for regularization
 - Batch size variations
 - Warmup steps for learning rate scheduler
 
-Next to that, I will increase the number of steps for the finetuning from 50 to 500.
-
-
-
- 
-
-
-get_optimal_hyperparameters.py:
-
-
-This script analyzes the results from the wandb sweeps
-It connects to wandb API to fetch all the experimental runs
-For each subtask, finds the best performing hyperparameters based on F1 score/MSE
-Writes the optimal parameters back to config.py as dictionaries for:
-
-Learning rates (lr_dict)
-Maximum epochs (max_epoch_dict)
-Early stopping patience (patience_dict)
-
-
-
-
-hyperparameter_explorer.py:
-
-
-This is an analysis tool that visualizes and compares different hyperparameter selection strategies
-It downloads the sweep results and analyzes them in three ways:
-
-Task-specific optimal parameters (best for each task)
-Task-specific with variance adjustment (more conservative)
-Global parameters (same across all tasks)
-
-
-Creates plots comparing these strategies
