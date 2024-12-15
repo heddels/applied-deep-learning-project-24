@@ -1,6 +1,6 @@
 """Training module for MTL model.
 
-Provides enhanced training functionality with:
+Provides enhanced training_baseline functionality with:
 - Comprehensive error handling
 - Memory optimization
 - Detailed logging
@@ -18,7 +18,6 @@ import statistics as stats
 from tqdm import tqdm
 from transformers import get_polynomial_decay_schedule_with_warmup
 
-from media_bias_detection.config.config import MAX_NUMBER_OF_STEPS
 from ..model.model_factory import ModelFactory
 from ..utils.enums import Split, LossScaling
 from ..utils.logger import general_logger
@@ -32,7 +31,7 @@ from ..data.dataset import BatchData
 
 
 class TrainerError(Exception):
-    """Custom exception for training-related errors."""
+    """Custom exception for training_baseline-related errors."""
     pass
 
 
@@ -40,7 +39,7 @@ class Trainer:
     """Enhanced trainer for MTL model.
 
     Features:
-    - Automatic mixed precision training
+    - Automatic mixed precision training_baseline
     - Memory-optimized batch processing
     - Detailed progress tracking
     - Comprehensive error handling
@@ -51,6 +50,7 @@ class Trainer:
             task_list: List[Task],
             initial_lr: float,
             model_name: str,
+            max_steps: int,
             pretrained_path: Optional[str],
             sub_batch_size: int,
             eval_batch_size: int,
@@ -134,7 +134,7 @@ class Trainer:
             self.progress_bar = tqdm(total=len(self.model.heads), desc="Training Progress")
             self.model_name = model_name
             self.scaling_weights = {str(st.id): st.get_scaling_weight() for t in task_list for st in t.subtasks_list}
-            self.MAX_NUMBER_OF_STEPS = MAX_NUMBER_OF_STEPS
+            self.max_steps = max_steps
             self.k = 50
 
             # Memory tracking
@@ -144,7 +144,7 @@ class Trainer:
             #checkpoint initialization
             self.checkpoint_manager = ModelCheckpoint(
                 save_dir=f"checkpoints/{model_name}",
-                save_freq=10,
+                save_freq=50,
                 monitor='combined_dev_loss',  # Monitor validation loss
             )
 
@@ -172,83 +172,74 @@ class Trainer:
             general_logger.warning(f"Memory optimization failed: {str(e)}")
 
     def head_specific_optimization(self, st_id: str, lm_grads, scaling_weight):
-        """
-        Perform the optimization of a task-specific head.
+        """Perform the optimization of a task-specific head.
 
-        This method is only called when mode is training.
-        @param st_id: The subtask id.
-        @param lm_grads: The LM gradients.
-        @param scaling_weight: The scaling weight of that subtask.
-        @return: A dictionary with additional payload containing the conflicting gradients ratio.
+        Args:
+            st_id: The subtask id
+            lm_grads: The LM gradients
+            scaling_weight: The scaling weight of that subtask
+
+        Returns:
+            Dictionary with additional payload
+
+        Raises:
+            TrainerError: If optimization fails
         """
         try:
             general_logger.info(f"Optimizing task {st_id}, alive: {self.task_alive_flags[st_id]}")
             additional_payload = {}
+            last_dev_loss = self.tracker.get_last_st_loss(split=Split.DEV, st_id=st_id, k=self.k)
 
-            # Check if we have dev metrics recorded
-            if self.tracker.losses[Split.DEV][st_id].values:
-                last_dev_loss = self.tracker.get_last_st_loss(split=Split.DEV, st_id=st_id, k=self.k)
+            should_stop_now = (
+                self.early_stopper.early_stop(st_id=st_id, dev_loss=last_dev_loss)
+                if (self.task_alive_flags[st_id] or self.task_zombie_flags[st_id])
+                else False
+            )
 
-                # Check early stopping conditions only if we have dev metrics
-                should_stop_now = (
-                    self.early_stopper.early_stop(st_id=st_id, dev_loss=last_dev_loss)
-                    if (self.task_alive_flags[st_id] or self.task_zombie_flags[st_id])
-                    else False
-                )
+            should_resurrect_now = (
+                self.early_stopper.resurrect(st_id=st_id, dev_loss=last_dev_loss)
+                if (not self.task_zombie_flags[st_id] and not self.task_alive_flags[st_id])
+                else False
+            )
 
-                should_resurrect_now = (
-                    self.early_stopper.resurrect(st_id=st_id, dev_loss=last_dev_loss)
-                    if (not self.task_zombie_flags[st_id] and not self.task_alive_flags[st_id])
-                    else False
-                )
+            should_stay_zombie = (
+                    not self.task_alive_flags[st_id] and
+                    self.task_zombie_flags[st_id] and
+                    not should_stop_now
+            )
 
-                should_stay_zombie = (
-                        not self.task_alive_flags[st_id] and
-                        self.task_zombie_flags[st_id] and
-                        not should_stop_now
-                )
+            # Handle task death
+            if should_stop_now and self.task_alive_flags[st_id]:
+                general_logger.info(f"Subtask {st_id} is now DEAD.")
+                self.eval_st(split=Split.EVAL, st_id=st_id)
+                self.tracker.log(splits=[Split.EVAL], additional_payload={st_id + "_STOPPED": 0})
+                self.progress_bar.update()
 
-                # Update task states based on conditions
-                if should_stop_now and self.task_alive_flags[st_id]:
-                    general_logger.info(f"Subtask {st_id} is now DEAD.")
-                    self.eval_st(split=Split.EVAL, st_id=st_id)
-                    if self.tracker.losses[Split.EVAL][st_id].values:
-                        self.tracker.log(splits=[Split.EVAL], additional_payload={st_id + "_STOPPED": 0})
-                        self.progress_bar.update()
-                    else:
-                        general_logger.warning(f"No evaluation metrics available for subtask {st_id}")
+            # Handle task resurrection
+            elif should_resurrect_now and not self.task_zombie_flags[st_id]:
+                general_logger.info(f"Subtask {st_id} is now ZOMBIE.")
+                additional_payload[st_id + "_ZOMBIE"] = 0
+                self.early_stopper.reset_early_stopper(st_id=st_id)
 
-                elif should_resurrect_now and not self.task_zombie_flags[st_id]:
-                    general_logger.info(f"Subtask {st_id} is now ZOMBIE.")
-                    additional_payload[st_id + "_ZOMBIE"] = 0
-                    self.early_stopper.reset_early_stopper(st_id=st_id)
+            # Handle zombie death
+            elif should_stop_now and self.task_zombie_flags[st_id]:
+                general_logger.info(f"Subtask {st_id} is now DEAD AGAIN.")
+                additional_payload[st_id + "_DEAD_ZOMBIE"] = 0
+                self.early_stopper.reset_early_stopper(st_id=st_id)
 
-                elif should_stop_now and self.task_zombie_flags[st_id]:
-                    general_logger.info(f"Subtask {st_id} is now DEAD AGAIN.")
-                    additional_payload[st_id + "_DEAD_ZOMBIE"] = 0
-                    self.early_stopper.reset_early_stopper(st_id=st_id)
+            # Update task states
+            self.task_alive_flags[st_id] = self.task_alive_flags[st_id] and not (
+                    should_stop_now or self.tracker.get_last_st_metric(split=Split.DEV, st_id=st_id, k=10) == 1
+            )
+            self.task_zombie_flags[st_id] = should_resurrect_now or should_stay_zombie
 
-                # Update flags
-                self.task_alive_flags[st_id] = (
-                        self.task_alive_flags[st_id] and
-                        not (should_stop_now or self.tracker.get_last_st_metric(split=Split.DEV, st_id=st_id,
-                                                                                k=10) == 1)
-                )
-                self.task_zombie_flags[st_id] = should_resurrect_now or should_stay_zombie
-
-            else:
-                # If no dev metrics yet, keep task alive and don't trigger early stopping
-                should_stop_now = False
-                self.task_alive_flags[st_id] = True
-                self.task_zombie_flags[st_id] = False
-
-            # Optimize task if it's alive or zombie
+            # Optimize if task is alive or zombie
             optimize_task = self.task_alive_flags[str(st_id)] or self.task_zombie_flags[str(st_id)]
             if optimize_task:
                 self.head_optimizers[st_id].step()
                 self.head_lr_schedulers[st_id].step()
 
-            # Update gradients if appropriate
+            # Update gradients
             if self.early_stopping_mode != EarlyStoppingMode.BACKBONE or optimize_task:
                 self.GA.update(lm_grads, scaling_weight=scaling_weight)
 
@@ -261,7 +252,7 @@ class Trainer:
         """
         Perform the optimization of the backbone.
 
-        This method is only called when mode is training.
+        This method is only called when mode is training_baseline.
         @return: A dictionary with additional payload containing the conflicting gradients ratio.
         """
         # Optimize the LM such that: we aggregate gradients from subtasks and set the final
@@ -359,7 +350,7 @@ class Trainer:
             raise TrainerError(f"Batch processing failed: {str(e)}")
 
     def _step(self, batch, training: bool = True):
-        """Perform a single training/evaluation step."""
+        """Perform a single training_baseline/evaluation step."""
         inputs = {
             "X": batch[0].to(self.device),
             "attention_masks": batch[1].to(self.device),
@@ -399,7 +390,7 @@ class Trainer:
     def fit_debug(self, k: int):
         """Fit for k iterations only to check if a model can process the data."""
         try:
-            general_logger.info(f"Starting the debug training for {k} iterations")
+            general_logger.info(f"Starting the debug training_baseline for {k} iterations")
             step = 0
             for _ in range(k):
                 step += 1
@@ -409,19 +400,19 @@ class Trainer:
                 batch = next(self.batch_lists[Split.DEV])
                 self.handle_batch(batch=batch, split=Split.DEV)
         except Exception as e:
-            general_logger.error(f"Debug training failed: {str(e)}")
-            raise TrainerError(f"Debug training failed: {str(e)}")
+            general_logger.error(f"Debug training_baseline failed: {str(e)}")
+            raise TrainerError(f"Debug training_baseline failed: {str(e)}")
 
     def fit(self):
         """Train the model."""
         try:
-            general_logger.info(f"Starting training with MAX_STEPS: {self.MAX_NUMBER_OF_STEPS}")
+            general_logger.info(f"Starting training_baseline with MAX_STEPS: {self.max_steps}")
             general_logger.info(f"Initial task states: {self.task_alive_flags}")
             step = 0
 
-            while step < self.MAX_NUMBER_OF_STEPS:
+            while step < self.max_steps:
                 if not any(self.task_alive_flags.values()):
-                    general_logger.info("No tasks remaining alive, stopping training")
+                    general_logger.info("No tasks remaining alive, stopping training_baseline")
                     break
 
                 step += 1
@@ -442,12 +433,9 @@ class Trainer:
                     splits=splits_to_log,
                     additional_payload=train_payload
                 )
-                # log every 10 steps
-                if step % 10 == 0:
-                    general_logger.info(f"We are ar at step {step}")
 
-                # Add checkpoint saving every 10 steps
-                if step % 10 == 0:  # Only save every 10 steps
+                # Add checkpoint saving every 50 steps
+                if step % 50 == 0:  # Only save every 50 steps
                     metrics = {
                         'combined_dev_loss': self.tracker.combined_losses[Split.DEV].mean_last_k(1),
                         'step': step

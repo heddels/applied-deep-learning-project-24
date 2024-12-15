@@ -3,7 +3,7 @@
 """Dataset handling module for MTL model.
 
 This module provides dataset classes for handling different types of data loading
-and batch generation for the MTL training process.
+and batch generation for the MTL training_baseline process.
 """
 
 from typing import List, Dict, Iterator, Tuple, Optional
@@ -150,7 +150,7 @@ class BatchList:
             sub_batch_size: Size of each sub-batch
             split: Which data split to use
             num_workers: Number of worker processes for data loading
-            pin_memory: Whether to pin memory in GPU training
+            pin_memory: Whether to pin memory in GPU training_baseline
         """
         general_logger.info(
             f"Creating BatchList with {len(subtask_list)} subtasks, "

@@ -4,6 +4,7 @@ import wandb
 from media_bias_detection.utils.enums import Split, AggregationMethod, LossScaling
 from media_bias_detection.utils.common import set_random_seed
 from media_bias_detection.config.config import (
+    MAX_NUMBER_OF_STEPS,
     head_specific_lr,
     head_specific_max_epoch,
     head_specific_patience
@@ -29,7 +30,7 @@ def main():
         for subtask in task.subtasks_list:
             subtask.process()
 
-    # Configure training parameters
+    # Configure training_baseline parameters
     config = {
         "sub_batch_size": 32,
         "eval_batch_size": 128,
@@ -44,6 +45,7 @@ def main():
         "pretrained_path": None,
         "resurrection": True,
         "model_name": MODEL_NAME,
+        "max_steps": MAX_NUMBER_OF_STEPS,
         "head_specific_lr_dict": head_specific_lr,
         "head_specific_patience_dict": head_specific_patience,
         "head_specific_max_epoch_dict": head_specific_max_epoch,
@@ -64,7 +66,7 @@ def main():
         # Create trainer
         trainer = Trainer(task_list=selected_tasks, **config)
 
-        # Run debug training
+        # Run debug training_baseline
         trainer.fit_debug(k=1)  # Just run one iteration
 
         # Test evaluation

@@ -18,10 +18,3 @@ class LossScaling(Enum):
     """Loss scaling methods."""
     STATIC = "static"
     UNIFORM = "uniform"
-
-class ModelCheckpoint(Enum):
-    """Available model architectures."""
-    DISTIL_BERT = "distilbert"
-    ROBERTA = "roberta"
-    BART = "bart"
-    MUPPET = "muppet"

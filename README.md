@@ -148,3 +148,84 @@ pproject_root/
 ```
 
 
+## Final Model Architecture
+The final model architecture is a simplified version of the MAGPIE model, using DistilBERT as the backbone and a
+multitask learning setup with xxxxx
+
+## Training and Evaluation
+The process of training the model is as follows:
+1. Train a baseline model with the hyperparameter setting of the MAGPIE paper:
+   - pre-finetune the DistilBERT Model on all datasets except for the BABE dataset
+   - finetune the model on the BABE dataset and compare over 30 random seeds
+2. Perform hyperparameter tuning to find the optimal hyperparameters for the model
+   - Increase the number of steps for pre-finetuning (from 100 to 500)
+   - Increase the number of steps for finetuning (from 50 to 200)
+   - 
+## Results
+
+### Baseline Model
+Pre Finetuning
+![img.png](plots/prefinetuning_combined_train_dev_loss.png)
+![img.png](plots/prefinetuning_dev_f1.png)
+- Erkenntnisse für prefinetuning?
+  - mehr steps
+  - selection of tasks?
+  - 
+Finetuning with Babe
+Mean Test F1: 68,77%
+Max Test F1: 71,43%
+![img_3.png](plots/finetuning_BABE_train_loss.png)
+![img_3.png](plots/finetuning_BABE_dev_f1_mean.png)
+![img_3.png](plots/finetuning_BABE_test.png)
+
+- 50 steps for finetuning, should be increased, loss is still "moving around"
+
+
+### Hyperparameter Tuning
+
+Since in the MAGPIE repository, they already did a hyperparameter tuning for the subtasks for:
+- learning rate
+- max epochs and
+- early stopping patience,
+I will use the hyperparameters from the MAGPIE paper and increase 
+the number of max_steps to 500 in comparison to my baseline, as well as the warmup steps to 10% of the max_steps.
+
+Next to that I will to a hyperparameter optimization with a random search with the following parameters:
+- Dropout rate for regularization
+- Batch size variations
+- Warmup steps for learning rate scheduler
+
+Next to that, I will increase the number of steps for the finetuning from 50 to 500.
+
+
+
+ 
+
+
+get_optimal_hyperparameters.py:
+
+
+This script analyzes the results from the wandb sweeps
+It connects to wandb API to fetch all the experimental runs
+For each subtask, finds the best performing hyperparameters based on F1 score/MSE
+Writes the optimal parameters back to config.py as dictionaries for:
+
+Learning rates (lr_dict)
+Maximum epochs (max_epoch_dict)
+Early stopping patience (patience_dict)
+
+
+
+
+hyperparameter_explorer.py:
+
+
+This is an analysis tool that visualizes and compares different hyperparameter selection strategies
+It downloads the sweep results and analyzes them in three ways:
+
+Task-specific optimal parameters (best for each task)
+Task-specific with variance adjustment (more conservative)
+Global parameters (same across all tasks)
+
+
+Creates plots comparing these strategies

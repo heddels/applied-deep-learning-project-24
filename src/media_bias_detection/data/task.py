@@ -15,7 +15,7 @@ from pathlib import Path
 from media_bias_detection.utils.common import get_class_weights
 from media_bias_detection.utils.enums import Split
 from media_bias_detection.utils.logger import general_logger
-from media_bias_detection.config.config import DEV_RATIO, MAX_LENGTH, TRAIN_RATIO, REGRESSION_SCALAR
+from media_bias_detection.config.config import DEV_RATIO, MAX_LENGTH, TRAIN_RATIO
 from ..tokenizer import tokenizer
 
 
@@ -434,69 +434,3 @@ class POSSubTask(SubTask):
         """
         return 1 / np.log(self.num_classes)
 
-
-# not used in current implementation, but important for testing?
-class MLMSubTask(SubTask):
-    """A Masked Language Modelling Subtask."""
-
-    def __init__(self, *args, **kwargs):
-        """Initialize a MLMSubTask."""
-        super(MLMSubTask, self).__init__(*args, **kwargs)
-
-    def load_data(self) -> Tuple[torch.LongTensor, torch.LongTensor, torch.LongTensor]:
-        """Load the data of a MLMSubTask."""
-        df = pd.read_csv(self.filename)
-        X = df[self.src_col]
-        tokenized_inputs = tokenizer(X.to_list(), padding="max_length", truncation=True, max_length=MAX_LENGTH)
-        X = torch.LongTensor(tokenized_inputs.get("input_ids"))
-        attention_masks = tokenized_inputs.get("attention_mask")
-
-        MASK_TOKEN = tokenizer.mask_token_id
-        SEP_TOKEN = tokenizer.sep_token_id
-        CLS_TOKEN = tokenizer.cls_token_id
-        PAD_TOKEN = tokenizer.pad_token_id
-
-        Y = X.clone()
-        rand = torch.rand(X.shape)
-        masking_mask = (rand < 0.15) * (X != SEP_TOKEN) * (X != CLS_TOKEN) * (X != PAD_TOKEN)
-        X[masking_mask] = MASK_TOKEN
-        Y[~masking_mask] = -100
-        return torch.LongTensor(X), torch.LongTensor(Y), torch.LongTensor(attention_masks)
-
-    def __repr__(self):
-        """Represent a MLM Subtask."""
-        return "Masked Language Modelling"
-
-    def get_scaling_weight(self):
-        """Get the weights for imbalanced classes."""
-        return 1 / np.log(len(tokenizer))
-
-# in current implementation, the regression subtask is not used
-class RegressionSubTask(SubTask):
-    """A RegressionSubTask."""
-
-    def __init__(self, *args, **kwargs):
-        """Initialize a RegressionSubTask."""
-        super(RegressionSubTask, self).__init__(*args, **kwargs)
-
-    def load_data(self) -> Tuple[torch.LongTensor, torch.FloatTensor, torch.LongTensor]:
-        """Load the data of a RegressionSubTask."""
-        df = pd.read_csv(self.filename)
-        X, Y = df[self.src_col], df[self.tgt_cols_list]
-        tokenized_inputs = tokenizer(X.to_list(), padding="max_length", truncation=True,
-                                     max_length=MAX_LENGTH)
-        X = tokenized_inputs.get("input_ids")
-        attention_masks = tokenized_inputs.get("attention_mask")
-        Y = (((Y - Y.min()) / (Y.max() - Y.min())).to_numpy()).astype("float32")  # scale from 0 to 1
-        return torch.LongTensor(X), torch.FloatTensor(Y), torch.LongTensor(attention_masks)
-
-    def __repr__(self):
-        """Represent a Regression Subtask."""
-        return "Regression"
-
-    def get_scaling_weight(self):
-        """Get the scaling weight of a Regression Subtask.
-
-        As of now, this scaling weight is a simple scalar and is a mere heuristic-based approximation (ie. we eyeballed it).
-        """
-        return REGRESSION_SCALAR

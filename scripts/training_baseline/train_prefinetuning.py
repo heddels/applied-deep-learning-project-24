@@ -1,4 +1,4 @@
-"""Script for executing the pre-finetuning on the subtasks excluding BABE."""
+"""Script for executing the pre-finetuning on the subtasks excluding BABE with 100 Steps."""
 from pathlib import Path
 
 import wandb
@@ -48,6 +48,7 @@ def main():
         "pretrained_path": None,
         "resurrection": True,
         "model_name": MODEL_NAME,
+        "max_steps": 100,  # Changed from 1000 to be able to run experiment in a reasonable time
         "head_specific_lr_dict": head_specific_lr,
         "head_specific_patience_dict": head_specific_patience,
         "head_specific_max_epoch_dict": head_specific_max_epoch,
@@ -71,7 +72,7 @@ def main():
 
             model=trainer.model,
 
-            step=-1,  # Special flag for interrupted training
+            step=-1,  # Special flag for interrupted training_baseline
 
             metrics={'interrupted': True}
 

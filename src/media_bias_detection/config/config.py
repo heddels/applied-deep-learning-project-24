@@ -52,7 +52,7 @@ dataset_id_to_family = {
     128: TaskFamilies.STANCE_DETECTION,
 }
 
-MAX_NUMBER_OF_STEPS = 50 # changed from 1000 to 100, 100 for prefinetuning and 50 for finetuning
+MAX_NUMBER_OF_STEPS = 200 # changed from 1000 to 100 for prefinetuning and 50 for finetuning
 
 # Task-configs
 MAX_LENGTH = 128
@@ -60,17 +60,14 @@ MAX_LENGTH = 128
 # reproducibility
 RANDOM_SEED = 321
 
-# regression constant scalar
-REGRESSION_SCALAR = 2.5
-
 # Split ratio for train/ dev/ test
 TRAIN_RATIO, DEV_RATIO, TEST_RATIO = 0.8, 0.1, 0.1
 
 # hyperparameter ranges
 hyper_param_dict = {
-    "lr": {"values": [5e-5, 4e-5, 3e-5, 2e-5, 1e-4]},
-    "patience": {"values": [25, 50, 75, 100]},
-    "max_epoch": {"values": [3, 5, 10]},
+    "dropout_prob": {"values": [0.1, 0.2, 0.3]},
+    "sub_batch_size": {"values": [16, 32, 64]},
+    "num_warmup_steps": {"values": [50, 100]},
 }
 
 

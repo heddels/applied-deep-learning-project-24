@@ -19,9 +19,7 @@ from ..data.task import (
     SubTask,
     ClassificationSubTask,
     MultiLabelClassificationSubTask,
-    POSSubTask,
-    RegressionSubTask,
-    MLMSubTask
+    POSSubTask
 )
 
 
@@ -66,10 +64,6 @@ def HeadFactory(st: SubTask, *args, **kwargs) -> 'BaseHead':
                 *args,
                 **kwargs
             )
-        elif isinstance(st, RegressionSubTask):
-            return RegressionHead(*args, **kwargs)
-        elif isinstance(st, MLMSubTask):
-            return LanguageModellingHead(*args, **kwargs)
         else:
             raise HeadError(f"Unsupported subtask type: {type(st)}")
     except Exception as e:
@@ -266,114 +260,3 @@ class TokenClassificationHead(BaseHead):
 
         except Exception as e:
             raise HeadError(f"Token classification forward pass failed: {str(e)}")
-
-
-class RegressionHead(BaseHead):
-    """Head for regression tasks.
-
-    Attributes:
-        dense: Dense layer
-        dropout: Dropout layer
-        out_proj: Output projection layer
-        loss: Loss function
-        metrics: Dictionary of metrics
-    """
-
-    def __init__(
-            self,
-            input_dimension: int,
-            hidden_dimension: int,
-            dropout_prob: float
-    ):
-        super().__init__()
-
-        self.dense = nn.Linear(input_dimension, hidden_dimension)
-        self.dropout = nn.Dropout(p=dropout_prob)
-        self.out_proj = nn.Linear(hidden_dimension, 1)
-
-        self.loss = nn.MSELoss()
-        self.metrics = {
-            "R2": R2Score(),
-            "MSE": MeanSquaredError()
-        }
-
-        general_logger.info("Initialized RegressionHead")
-
-    def forward(self, X: torch.Tensor, y: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, Dict]:
-        try:
-            # Get CLS token
-            x = X[:, 0, :]
-
-            # Pass through layers
-            x = self.dropout(x)
-            x = self.dense(x)
-            x = torch.tanh(x)
-            x = self.dropout(x)
-            logits = self.out_proj(x)
-
-            loss = self.loss(logits.squeeze(), y.squeeze())
-
-            metrics = {
-                name: metric(logits.cpu(), y.cpu()).detach()
-                for name, metric in self.metrics.items()
-            }
-
-            return logits, loss, metrics
-
-        except Exception as e:
-            raise HeadError(f"Regression forward pass failed: {str(e)}")
-
-
-class LanguageModellingHead(BaseHead):
-    """Head for masked language modeling tasks.
-
-    Attributes:
-        dense: Dense layer
-        layer_norm: Layer normalization
-        decoder: Output decoder
-        loss: Loss function
-        metrics: Dictionary of metrics
-    """
-
-    def __init__(
-            self,
-            input_dimension: int,
-            hidden_dimension: int,
-            dropout_prob: float
-    ):
-        super().__init__()
-
-        self.dense = nn.Linear(input_dimension, hidden_dimension)
-        self.layer_norm = nn.LayerNorm(hidden_dimension, eps=1e-5)
-        self.gelu = nn.GELU()
-
-        self.decoder = nn.Linear(hidden_dimension, tokenizer.vocab_size)
-        self.bias = nn.Parameter(torch.zeros(tokenizer.vocab_size))
-        self.decoder.bias = self.bias
-
-        self.loss = nn.CrossEntropyLoss()
-        self.metrics = {"perplexity": Perplexity()}
-
-        general_logger.info("Initialized LanguageModellingHead")
-
-    def forward(self, X: torch.Tensor, y: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, Dict]:
-        try:
-            x = self.dense(X)
-            x = self.gelu(x)
-            x = self.layer_norm(x)
-
-            logits = self.decoder(x)
-            loss = self.loss(
-                logits.view(-1, tokenizer.vocab_size),
-                y.view(-1)
-            )
-
-            metrics = {
-                name: metric(logits.cpu(), y.cpu())
-                for name, metric in self.metrics.items()
-            }
-
-            return logits, loss, metrics
-
-        except Exception as e:
-            raise HeadError(f"Language modeling forward pass failed: {str(e)}")

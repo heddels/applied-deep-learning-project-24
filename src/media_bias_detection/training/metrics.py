@@ -1,6 +1,6 @@
 """Metrics tracking and computation module.
 
-This module provides classes and utilities for tracking metrics during training,
+This module provides classes and utilities for tracking metrics during training_baseline,
 computing running averages, and managing metric history.
 """
 
@@ -23,9 +23,6 @@ class MetricError(Exception):
 class AverageMeter:
     """Tracks running average of a metric.
 
-    This class maintains a history of values and provides
-    different methods for computing averages.
-
     Attributes:
         name: Name of the metric
         values: List of recorded values
@@ -34,6 +31,36 @@ class AverageMeter:
     def __init__(self, name: str):
         self.name = name
         self.values: List[float] = []
+
+    def mean_last_k(self, k: int = 10) -> float:
+        """Calculate mean of last k values.
+
+        Args:
+            k: Number of last values to average
+
+        Returns:
+            Mean of last k values or NaN if not enough values
+        """
+        if k < 1:
+            general_logger.warning(f"Invalid k value ({k}) for metric {self.name}")
+            return float("NaN")
+
+        vals = self.values[-k:] if self.values else []
+        if len(vals) < k:
+            return float("NaN")
+
+        return float(np.mean(vals))
+
+    def mean_all(self) -> float:
+        """Calculate mean of all values.
+
+        Returns:
+            Mean of all values or NaN if no values
+        """
+        if not self.values:
+            return float("NaN")
+
+        return float(np.mean(self.values))
 
     def update(self, value: float) -> None:
         """Add a new value to history.
@@ -44,66 +71,11 @@ class AverageMeter:
         try:
             self.values.append(float(value))
         except (TypeError, ValueError) as e:
-            raise MetricError(f"Invalid value for metric {self.name}: {str(e)}")
-
-    def mean_last_k(self, k: int = 10) -> float:
-        """Calculate mean of last k values.
-
-        Args:
-            k: Number of last values to average
-
-        Returns:
-            Mean of last k values
-
-        Raises:
-            MetricError: If not enough values available
-        """
-        try:
-            if k < 1:
-                raise MetricError("k must be positive")
-            if not self.values:
-                raise MetricError("No values recorded")
-            if len(self.values) < k:
-                return float("nan")
-            return float(np.mean(self.values[-k:]))
-        except Exception as e:
-            raise MetricError(f"Error computing mean_last_k: {str(e)}")
-
-    def mean_all(self) -> float:
-        """Calculate mean of all values.
-
-        Returns:
-            Mean of all values
-
-        Raises:
-            MetricError: If no values available
-        """
-        try:
-            if not self.values:
-                raise MetricError("No values recorded")
-            return float(np.mean(self.values))
-        except Exception as e:
-            raise MetricError(f"Error computing mean_all: {str(e)}")
-
-    def reset(self) -> None:
-        """Clear all recorded values."""
-        self.values.clear()
-
-    def get_history(self) -> List[float]:
-        """Get complete history of values.
-
-        Returns:
-            List of all recorded values
-        """
-        return self.values.copy()
-
-    def __repr__(self) -> str:
-        """String representation showing latest value."""
-        return f"{self.mean_last_k(1):.4f}"
+            general_logger.warning(f"Invalid value for metric {self.name}: {str(e)}")
 
 
 class Tracker:
-    """Tracks metrics and losses across training.
+    """Tracks metrics and losses across training_baseline.
 
     This class manages metrics and losses for different splits
     and tasks, providing logging and analysis capabilities.
@@ -189,13 +161,13 @@ class Tracker:
             raise MetricError(f"Failed to initialize losses: {str(e)}")
 
     def __str__(self) -> str:
-        """Return string representation of current training state."""
+        """Return string representation of current training_baseline state."""
         try:
-            # Get both training loss and metrics
+            # Get both training_baseline loss and metrics
             train_loss = self.combined_losses[Split.TRAIN].mean_last_k(1)
             metrics_str = []
 
-            # Add training loss if available
+            # Add training_baseline loss if available
             if not np.isnan(train_loss):
                 metrics_str.append(f"Loss: {train_loss:.4f}")
 
@@ -343,7 +315,7 @@ class Tracker:
                            for d in self.metrics[split].values()):
                     general_logger.warning(f"No metrics recorded for split {split}, skipping logging")
                     continue
-                # For training and validation, log last values
+                # For training_baseline and validation, log last values
                 if split in [Split.DEV, Split.TRAIN]:
                     # Log metrics
                     metrics = {

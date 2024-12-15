@@ -1,4 +1,4 @@
-"""Training utilities module for MTL training.
+"""Training utilities module for MTL training_baseline.
 
 Contains utility classes for:
 - Logging
@@ -79,13 +79,13 @@ class EarlyStopperSingle:
         self.resurrection = resurrection
 
     def early_stop(self, dev_loss: float) -> bool:
-        """Check if training should stop.
+        """Check if training_baseline should stop.
 
         Args:
             dev_loss: Current validation loss
 
         Returns:
-            Whether to stop training
+            Whether to stop training_baseline
         """
         if math.isnan(dev_loss):
             return False
@@ -100,13 +100,13 @@ class EarlyStopperSingle:
         return False
 
     def resurrect(self, dev_loss: float) -> bool:
-        """Check if training should resume.
+        """Check if training_baseline should resume.
 
         Args:
             dev_loss: Current validation loss
 
         Returns:
-            Whether to resume training
+            Whether to resume training_baseline
         """
         if math.isnan(dev_loss) or not self.resurrection:
             return False

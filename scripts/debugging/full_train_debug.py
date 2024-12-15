@@ -3,7 +3,7 @@ from pathlib import Path
 import wandb
 from media_bias_detection.utils.enums import Split, AggregationMethod, LossScaling
 from media_bias_detection.utils.common import set_random_seed
-from media_bias_detection.config.config import head_specific_lr
+from media_bias_detection.config.config import head_specific_lr, MAX_NUMBER_OF_STEPS
 
 from media_bias_detection.training.training_utils import Logger, EarlyStoppingMode
 from media_bias_detection.data import test_tasks
@@ -34,7 +34,7 @@ def main():
     EXPERIMENT_NAME = "debug_task_death"
     MODEL_NAME = "debug_death_model"
 
-    # Add checkpoint path for resuming training
+    # Add checkpoint path for resuming training_baseline
     CHECKPOINT_PATH = Path("checkpoints") / MODEL_NAME / "latest.pt"
     resume_training = CHECKPOINT_PATH.exists()
 
@@ -62,6 +62,7 @@ def main():
         "head_specific_patience_dict": head_specific_patience,
         "head_specific_max_epoch_dict": head_specific_max_epoch,
         "model_name": MODEL_NAME,
+        "max_steps": MAX_NUMBER_OF_STEPS,
         "logger": Logger(EXPERIMENT_NAME)
     }
 
@@ -74,7 +75,7 @@ def main():
 
         #not working
         if resume_training:
-            print(f"Resuming training from checkpoint: {CHECKPOINT_PATH}")
+            print(f"Resuming training_baseline from checkpoint: {CHECKPOINT_PATH}")
             trainer.checkpoint_manager.load_checkpoint(
                 filepath=CHECKPOINT_PATH,
                 model=trainer.model
@@ -99,7 +100,7 @@ def main():
 
             model=trainer.model,
 
-            step=-1,  # Special flag for interrupted training
+            step=-1,  # Special flag for interrupted training_baseline
 
             metrics={'interrupted': True}
 
@@ -108,7 +109,7 @@ def main():
         print("Checkpoint saved!")
 
     except Exception as e:
-        print(f"Debug training failed with error: {str(e)}")
+        print(f"Debug training_baseline failed with error: {str(e)}")
         raise e
     #finally:
         wandb.finish()
