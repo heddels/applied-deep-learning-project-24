@@ -1,8 +1,26 @@
 """Model heads implementation for MTL model.
 
-This module contains all task-specific heads and the factory for creating them.
-Each head implements specific logic for different types of tasks while maintaining
-consistent interfaces for the MTL architecture.
+This module handles the task-specific processing parts of the model:
+
+
+Types of Heads:
+1. ClassificationHead: For yes/no or multiple choice tasks
+   - Binary classification (e.g., biased/unbiased)
+   - Multi-class classification (e.g., emotion types)
+
+2. TokenClassificationHead: For word-level tasks
+   - Identifying specific words (e.g., biased terms)
+   - Marking spans of text
+
+Features:
+- Factory pattern to create appropriate heads
+- Common interface across head types
+- Automatic metric tracking (accuracy, F1 score)
+- Handles both single and multi-label tasks
+
+Note: Each head takes features from the backbone and processes them
+for its specific task. Think of heads as specialized experts that
+each look at the same text but focus on different aspects.
 """
 
 from typing import Dict, Tuple, Optional
@@ -16,17 +34,18 @@ from ..data.task import (
     SubTask,
     ClassificationSubTask,
     MultiLabelClassificationSubTask,
-    POSSubTask
+    POSSubTask,
 )
 from ..utils.logger import general_logger
 
 
 class HeadError(Exception):
     """Custom exception for head-related errors."""
+
     pass
 
 
-def HeadFactory(st: SubTask, *args, **kwargs) -> 'BaseHead':
+def HeadFactory(st: SubTask, *args, **kwargs) -> "BaseHead":
     """Create appropriate head based on subtask type.
 
     Args:
@@ -45,7 +64,7 @@ def HeadFactory(st: SubTask, *args, **kwargs) -> 'BaseHead':
                 num_classes=st.num_classes,
                 class_weights=st.class_weights,
                 *args,
-                **kwargs
+                **kwargs,
             )
         elif isinstance(st, MultiLabelClassificationSubTask):
             return ClassificationHead(
@@ -53,14 +72,14 @@ def HeadFactory(st: SubTask, *args, **kwargs) -> 'BaseHead':
                 num_labels=st.num_labels if st.num_labels is not None else 2,
                 class_weights=st.class_weights,
                 *args,
-                **kwargs
+                **kwargs,
             )
         elif isinstance(st, POSSubTask):
             return TokenClassificationHead(
                 num_classes=st.num_classes,
                 class_weights=st.class_weights,
                 *args,
-                **kwargs
+                **kwargs,
             )
         else:
             raise HeadError(f"Unsupported subtask type: {type(st)}")
@@ -79,7 +98,9 @@ class BaseHead(GradsWrapper):
         super().__init__()
         self.metrics: Dict = {}
 
-    def forward(self, X: torch.Tensor, y: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, Dict]:
+    def forward(
+        self, X: torch.Tensor, y: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor, Dict]:
         """Forward pass through the head.
 
         Args:
@@ -94,13 +115,13 @@ class BaseHead(GradsWrapper):
 
 class ClassificationHead(BaseHead):
     def __init__(
-            self,
-            input_dimension: int,
-            hidden_dimension: int,
-            dropout_prob: float,
-            num_classes: int = 2,
-            num_labels: int = 1,
-            class_weights: Optional[torch.Tensor] = None
+        self,
+        input_dimension: int,
+        hidden_dimension: int,
+        dropout_prob: float,
+        num_classes: int = 2,
+        num_labels: int = 1,
+        class_weights: Optional[torch.Tensor] = None,
     ):
         super().__init__()
 
@@ -122,7 +143,7 @@ class ClassificationHead(BaseHead):
                     num_classes=num_classes,
                     num_labels=num_labels,
                     task="multilabel",
-                    average="macro"
+                    average="macro",
                 ),
                 "acc": Accuracy(
                     task="multilabel",
@@ -135,7 +156,7 @@ class ClassificationHead(BaseHead):
                 "f1": F1Score(
                     num_classes=num_classes,
                     task="binary" if num_classes == 2 else "multiclass",
-                    average="macro"
+                    average="macro",
                 ),
                 "acc": Accuracy(
                     task="binary" if num_classes == 2 else "multiclass",
@@ -143,7 +164,9 @@ class ClassificationHead(BaseHead):
                 ),
             }
 
-    def forward(self, X: torch.Tensor, y: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, Dict]:
+    def forward(
+        self, X: torch.Tensor, y: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor, Dict]:
         try:
             batch_size = y.shape[0]
 
@@ -172,7 +195,9 @@ class ClassificationHead(BaseHead):
             loss = self.loss(logits, y)
 
             # Get predictions in correct shape for metrics
-            predictions = torch.argmax(logits, dim=-1)  # Use last dimension for class prediction
+            predictions = torch.argmax(
+                logits, dim=-1
+            )  # Use last dimension for class prediction
 
             # Calculate metrics
             metrics = {
@@ -198,13 +223,13 @@ class TokenClassificationHead(BaseHead):
     """
 
     def __init__(
-            self,
-            num_classes: int,
-            class_weights: Optional[torch.Tensor],
-            hidden_dimension: int,
-            dropout_prob: float,
-            *args,
-            **kwargs
+        self,
+        num_classes: int,
+        class_weights: Optional[torch.Tensor],
+        hidden_dimension: int,
+        dropout_prob: float,
+        *args,
+        **kwargs,
     ):
         super().__init__()
 
@@ -214,22 +239,17 @@ class TokenClassificationHead(BaseHead):
         self.loss = nn.CrossEntropyLoss(weight=class_weights)
 
         self.metrics = {
-            "f1": F1Score(
-                num_classes=num_classes,
-                task="multiclass",
-                average="macro"
-            ),
-            "acc": Accuracy(
-                task="multiclass",
-                num_classes=num_classes
-            ),
+            "f1": F1Score(num_classes=num_classes, task="multiclass", average="macro"),
+            "acc": Accuracy(task="multiclass", num_classes=num_classes),
         }
 
         general_logger.info(
             f"Initialized TokenClassificationHead with {num_classes} classes"
         )
 
-    def forward(self, X: torch.Tensor, y: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, Dict]:
+    def forward(
+        self, X: torch.Tensor, y: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor, Dict]:
         try:
             # Process sequence
             sequence_output = self.dropout(X)
@@ -241,8 +261,7 @@ class TokenClassificationHead(BaseHead):
             # Mask padding tokens for metrics
             mask = torch.where(y != -100, 1, 0)
             logits = torch.masked_select(
-                logits,
-                mask.unsqueeze(-1).expand(logits.size()) == 1
+                logits, mask.unsqueeze(-1).expand(logits.size()) == 1
             )
             y = torch.masked_select(y, mask == 1)
             logits = logits.view(y.shape[0], self.num_classes)

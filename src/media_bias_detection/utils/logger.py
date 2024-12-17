@@ -1,3 +1,15 @@
+"""Logging configuration for the entire project.
+
+Sets up a centralized logger that:
+1. Writes to both file and console
+2. Includes timestamps and log levels
+3. Creates log directory if needed
+
+Format: [Time: Level: Module: Message]
+Location: debug_logs/running_logs.log
+Default Level: WARNING
+"""
+
 import logging
 import os
 import sys
@@ -11,11 +23,7 @@ os.makedirs(log_dir, exist_ok=True)
 logging.basicConfig(
     level=logging.WARNING,
     format=logging_str,
-
-    handlers=[
-        logging.FileHandler(log_filepath),
-        logging.StreamHandler(sys.stdout)
-    ]
+    handlers=[logging.FileHandler(log_filepath), logging.StreamHandler(sys.stdout)],
 )
 
 general_logger = logging.getLogger("media_bias_detectionLogger")

@@ -1,5 +1,11 @@
-"""This module can be executed to run a hyperparameter training_baseline job for multiple tasks, each task alone.
-It is taken from the scripts/hyperparameter_tuning/hyperparameter_tuning.py file. of the MAGPIE repository."""
+"""Hyperparameter optimization script for finetuning of the MTL model.
+
+Performs grid search over:
+- Batch size
+- Warmup steps
+- Dropout probability
+
+It is taken from the scripts/hyperparameter_tuning/hyperparameter_tuning.py file of the MAGPIE repository."""
 
 import os
 
@@ -10,7 +16,7 @@ from media_bias_detection.config.config import (
     hyper_param_dict,
     head_specific_lr,
     head_specific_max_epoch,
-    head_specific_patience
+    head_specific_patience,
 )
 from media_bias_detection.data.task import Task
 from media_bias_detection.training.trainer import Trainer
@@ -51,7 +57,7 @@ def train_wrapper():
         "head_specific_lr_dict": head_specific_lr,
         "head_specific_patience_dict": head_specific_patience,
         "head_specific_max_epoch_dict": head_specific_max_epoch,
-        "logger": Logger(EXPERIMENT_NAME)
+        "logger": Logger(EXPERIMENT_NAME),
     }
 
     trainer = Trainer(task_list=task_wrapper, **our_config)
@@ -59,16 +65,17 @@ def train_wrapper():
 
 
 if __name__ == "__main__":
-    for st in [media_bias_detection.data.st_2_babe_10]:  # done for st_1_babe_10 and st_2_babe_10
+    for st in [media_bias_detection.data.st_1_babe_10]:
         st.process()
         task_wrapper = [Task(task_id=st.id, subtasks_list=[st])]
 
-        # wandb sweep
-        sweep_config = {"method": "grid",
-                        "metric": {"name": "eval_f1", "goal": "maximize"},
-                        "parameters": hyper_param_dict,
-                        "early_terminate": {"type": "hyperband", "min_iter": 3},
-                        "name": str(st)}
+        sweep_config = {
+            "method": "grid",
+            "metric": {"name": "eval_f1", "goal": "maximize"},
+            "parameters": hyper_param_dict,
+            "early_terminate": {"type": "hyperband", "min_iter": 3},
+            "name": str(st),
+        }
         sweep_id = wandb.sweep(sweep_config, project="hyperparam-tuning")
 
         wandb.agent(sweep_id, train_wrapper)

@@ -1,3 +1,25 @@
+"""Utility functions for file operations and data handling.
+
+This module provides helper functions for:
+1. File Operations
+  - Reading/writing YAML, JSON, and binary files
+  - Creating directories
+  - Getting file sizes
+
+2. Formatting
+  - Integer formatting with commas
+  - Float formatting with precision
+  - Class weight calculations
+
+3. System Utilities
+  - Random seed setting
+  - Recursive attribute access
+  - Type checking with decorators
+
+Most functions use @ensure_annotations to validate input types
+and include logging for tracking operations.
+"""
+
 import functools
 import json
 import os

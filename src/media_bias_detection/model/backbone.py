@@ -1,4 +1,20 @@
-"""Backbone model module providing the shared language model."""
+"""Backbone model module providing the shared language model.
+
+This module serves as the core encoder that all tasks share, using DistilBERT:
+
+Key Points:
+1. Shared Model:
+   - Single DistilBERT model used by all tasks
+   - Saves memory compared to separate models
+   - Allows tasks to learn from each other
+
+2. Features:
+   - Loads pre-trained DistilBERT weights
+   - Can load custom trained weights
+   - Handles errors during loading
+
+Note: Inherits from GradsWrapper to manage gradients during training
+"""
 
 import torch
 from transformers import DistilBertModel
@@ -27,7 +43,7 @@ class BackboneLM(GradsWrapper):
 
         try:
             general_logger.info("Initializing backbone language model")
-            self.backbone = DistilBertModel.from_pretrained('distilbert-base-uncased')
+            self.backbone = DistilBertModel.from_pretrained("distilbert-base-uncased")
 
             if pretrained_path:
                 self.load_pretrained(pretrained_path)

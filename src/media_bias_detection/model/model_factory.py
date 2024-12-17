@@ -1,6 +1,32 @@
-# TO DO: muss mit restlichen modulen abgeglichen werden
+"""Model factory module for MTL model creation and initialization.
 
-"""Module for creating instantiating the appropriate model defined by the task list only."""
+This module handles the complete setup of the MTL model:
+
+1. Model Creation:
+   Model + Task-Specific Heads
+            │
+            ├─ Training DataLoaders
+            │   ├─ Batch List (Train)
+            │   └─ Batch List (Dev)
+            │
+            └─ Evaluation DataLoaders
+                ├─ Batch List (Eval)
+                └─ Batch List (Test)
+
+2. Weight Management:
+   - Load pretrained weights if available
+   - Save/load head initializations
+   - Ensure reproducible initialization
+
+Features:
+- Single entry point for model creation
+- Automatic dataloader setup for all splits
+- Device handling (CPU/GPU)
+- Weight management utilities
+
+Note: This module coordinates all components needed for training,
+ensuring they work together properly (model, data, devices).
+"""
 
 from typing import List
 
@@ -13,12 +39,12 @@ from ..utils.logger import general_logger
 
 
 def ModelFactory(
-        task_list: List,
-        sub_batch_size: int,
-        eval_batch_size: int,
-        pretrained_path: str = None,
-        *args,
-        **kwargs
+    task_list: List,
+    sub_batch_size: int,
+    eval_batch_size: int,
+    pretrained_path: str = None,
+    *args,
+    **kwargs,
 ):
     """Create model and return it along with dataloaders."""
     # Get all subtasks from task list
@@ -40,27 +66,19 @@ def ModelFactory(
     try:
         # Create dataloaders with updated classes
         batch_list_train = BatchList(
-            subtask_list=subtask_list,
-            sub_batch_size=sub_batch_size,
-            split=Split.TRAIN
+            subtask_list=subtask_list, sub_batch_size=sub_batch_size, split=Split.TRAIN
         )
 
         batch_list_dev = BatchList(
-            subtask_list=subtask_list,
-            sub_batch_size=sub_batch_size,
-            split=Split.DEV
+            subtask_list=subtask_list, sub_batch_size=sub_batch_size, split=Split.DEV
         )
 
         batch_list_eval = BatchListEvalTest(
-            subtask_list=subtask_list,
-            sub_batch_size=eval_batch_size,
-            split=Split.DEV
+            subtask_list=subtask_list, sub_batch_size=eval_batch_size, split=Split.DEV
         )
 
         batch_list_test = BatchListEvalTest(
-            subtask_list=subtask_list,
-            sub_batch_size=eval_batch_size,
-            split=Split.TEST
+            subtask_list=subtask_list, sub_batch_size=eval_batch_size, split=Split.TEST
         )
 
         return model, batch_list_train, batch_list_dev, batch_list_eval, batch_list_test
@@ -72,15 +90,18 @@ def ModelFactory(
 
 def save_head_initializations(model):
     """Save weight initialization of the head. This method will not be called anymore.
-     It's only for the initial saving of weight inits for all tasks."""
+    It's only for the initial saving of weight inits for all tasks."""
     for head_name in model.heads.keys():
-        torch.save(model.heads[head_name].state_dict(), 'model_files/heads/' + head_name + '_init.pth')
+        torch.save(
+            model.heads[head_name].state_dict(),
+            "model_files/heads/" + head_name + "_init.pth",
+        )
 
 
 def load_head_initializations(model):
     """Load fixed weight initialization for each head in order to ensure reproducibility."""
     for head_name in model.heads.keys():
-        weights_path = 'model_files/heads/' + head_name + '_init.pth'
+        weights_path = "model_files/heads/" + head_name + "_init.pth"
         head_weights = torch.load(weights_path)
         model.heads[head_name].load_state_dict(head_weights, strict=True)
 

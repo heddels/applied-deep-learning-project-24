@@ -1,7 +1,34 @@
 """Dataset handling module for MTL model.
 
-This module provides dataset classes for handling different types of data loading
-and batch generation for the MTL training_baseline process.
+This module implements efficient data loading and batch generation for multi-task learning.
+The architecture follows a hierarchical structure:
+
+BatchList (Training)           BatchListEvalTest (Evaluation)
+    │                                   │
+    ├─ SubTaskDataset 1                ├─ SubTaskDataset 1
+    ├─ SubTaskDataset 2                ├─ SubTaskDataset 2
+    └─ SubTaskDataset N                └─ SubTaskDataset N
+
+Key Features:
+1. Memory-Efficient Loading:
+   - Lazy loading of data
+   - Automatic batch memory pinning for GPU
+   - Configurable number of worker processes
+
+2. Continuous Batch Generation:
+   - Automatic dataset reset when exhausted
+   - Random shuffling between epochs
+   - Support for variable batch sizes
+
+3. Multi-Task Management:
+   - Separate dataloaders per subtask
+   - Task-specific batch generation
+   - Automatic handling of different task types
+
+Implementation Notes:
+- Uses PyTorch's Dataset/DataLoader infrastructure
+- Maintains dataset state across iterations
+- Provides reproducible shuffling with seed control
 """
 
 import random
@@ -21,16 +48,19 @@ from .task import SubTask
 
 # data class thing is not han
 
+
 @dataclass
 class BatchData:
-    """Container for batch data.
+    """Container for a single batch of task data.
 
-    Attributes:
-        input_ids: Token IDs from tokenizer
-        attention_mask: Attention mask for padding
-        labels: Target labels
-        subtask_id: ID of the subtask this batch belongs to
+    This class standardizes batch data across different task types,
+    ensuring consistent interface for the model training loop.
+
+    Memory Management Note:
+    - Tensors are moved to GPU if available
+    - Attention masks optimize memory for padded sequences
     """
+
     input_ids: torch.Tensor
     attention_mask: torch.Tensor
     labels: torch.Tensor
@@ -51,9 +81,9 @@ class SubTaskDataset(Dataset):
     """
 
     def __init__(
-            self,
-            subtask: SubTask,
-            split: Split,
+        self,
+        subtask: SubTask,
+        split: Split,
     ) -> None:
         """Initialize the dataset.
 
@@ -61,10 +91,14 @@ class SubTaskDataset(Dataset):
             subtask: SubTask instance containing the data
             split: Which data split to use
         """
-        general_logger.info(f"Initializing dataset for subtask {subtask.id} with split {split}")
+        general_logger.info(
+            f"Initializing dataset for subtask {subtask.id} with split {split}"
+        )
 
         if not subtask.processed:
-            raise RuntimeError(f"Subtask {subtask.id} must be processed before creating dataset")
+            raise RuntimeError(
+                f"Subtask {subtask.id} must be processed before creating dataset"
+            )
 
         self.split = split
         self.subtask = subtask
@@ -76,7 +110,9 @@ class SubTaskDataset(Dataset):
         """Get number of items in dataset."""
         return len(self.observations)
 
-    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, int]:
+    def __getitem__(
+        self, idx: int
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, int]:
         """Get a single item from the dataset.
 
         Args:
@@ -100,10 +136,7 @@ class SubTaskDataset(Dataset):
             y = self.subtask.get_Y(split=self.split)[i]
 
             batch_data = BatchData(
-                input_ids=x,
-                attention_mask=masks,
-                labels=y,
-                subtask_id=self.subtask.id
+                input_ids=x, attention_mask=masks, labels=y, subtask_id=self.subtask.id
             )
 
             self._counter += 1
@@ -116,9 +149,13 @@ class SubTaskDataset(Dataset):
     def _reset(self) -> None:
         """Reset the dataset state and shuffle observations."""
         general_logger.info(f"Resetting dataset for subtask {self.subtask.id}")
-        self.observations = [i for i in range(len(self.subtask.get_X(split=self.split)))]
+        self.observations = [
+            i for i in range(len(self.subtask.get_X(split=self.split)))
+        ]
         set_random_seed()
-        np.random.shuffle(self.observations)  # Not a real 'reshuffling' as it will always arrange same.
+        np.random.shuffle(
+            self.observations
+        )  # Not a real 'reshuffling' as it will always arrange same.
         self._counter = 0
 
 
@@ -137,12 +174,12 @@ class BatchList:
     """
 
     def __init__(
-            self,
-            subtask_list: List[SubTask],
-            sub_batch_size: int,
-            split: Split = Split.TRAIN,
-            num_workers: int = 0,
-            pin_memory: bool = True
+        self,
+        subtask_list: List[SubTask],
+        sub_batch_size: int,
+        split: Split = Split.TRAIN,
+        num_workers: int = 0,
+        pin_memory: bool = True,
     ) -> None:
         """Initialize BatchList.
 
@@ -162,8 +199,7 @@ class BatchList:
         self.sub_batch_size = sub_batch_size
 
         self.datasets = {
-            str(st.id): SubTaskDataset(subtask=st, split=split)
-            for st in subtask_list
+            str(st.id): SubTaskDataset(subtask=st, split=split) for st in subtask_list
         }
 
         self.dataloaders = {
@@ -171,14 +207,13 @@ class BatchList:
                 dataset,
                 batch_size=self.sub_batch_size,
                 num_workers=num_workers,
-                pin_memory=pin_memory
+                pin_memory=pin_memory,
             )
             for st_id, dataset in self.datasets.items()
         }
 
         self.iter_dataloaders = {
-            st_id: iter(dl)
-            for st_id, dl in self.dataloaders.items()
+            st_id: iter(dl) for st_id, dl in self.dataloaders.items()
         }
 
         # Statistics tracking
@@ -218,7 +253,9 @@ class BatchList:
 
     def _reset(self):
         """Reset this BatchListEvalTest."""
-        self.iter_dataloaders = {f"{st_id}": iter(dl) for st_id, dl in self.dataloaders.items()}
+        self.iter_dataloaders = {
+            f"{st_id}": iter(dl) for st_id, dl in self.dataloaders.items()
+        }
 
 
 class BatchListEvalTest:
@@ -226,14 +263,21 @@ class BatchListEvalTest:
 
     def __init__(self, subtask_list: List[SubTask], sub_batch_size, split=Split.TRAIN):
         self.sub_batch_size = sub_batch_size
-        self.datasets = {f"{st.id}": SubTaskDataset(subtask=st, split=split) for st in subtask_list}
-        self.dataloaders = {
-            f"{st_id}": DataLoader(ds, batch_size=self.sub_batch_size) for st_id, ds in self.datasets.items()
+        self.datasets = {
+            f"{st.id}": SubTaskDataset(subtask=st, split=split) for st in subtask_list
         }
-        self.iter_dataloaders = {f"{st_id}": iter(dl) for st_id, dl in self.dataloaders.items()}
+        self.dataloaders = {
+            f"{st_id}": DataLoader(ds, batch_size=self.sub_batch_size)
+            for st_id, ds in self.datasets.items()
+        }
+        self.iter_dataloaders = {
+            f"{st_id}": iter(dl) for st_id, dl in self.dataloaders.items()
+        }
 
     def __len__(self):
         return min(len(dl) for dl in self.dataloaders.values())
 
     def _reset(self):  # Add this method matching the original
-        self.iter_dataloaders = {f"{st_id}": iter(dl) for st_id, dl in self.dataloaders.items()}
+        self.iter_dataloaders = {
+            f"{st_id}": iter(dl) for st_id, dl in self.dataloaders.items()
+        }

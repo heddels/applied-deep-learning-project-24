@@ -1,4 +1,23 @@
-"""Config file."""
+"""Configuration management for the Media Bias Detection MTL model.
+
+This module centralizes all configuration parameters for the multi-task learning model,
+including:
+- Dataset mappings and task family definitions
+- Training hyperparameters
+- Model architecture settings
+- Task-specific configurations
+
+The configuration is organized into several key sections:
+1. Dataset Mappings: Links dataset IDs to names and task families
+2. Global Training Parameters: Steps, seeds, and data splits
+3. Hyperparameter Search Spaces: Used for optimization
+4. Task-Specific Parameters: Learning rates, patience values, and epochs per task
+
+Note: Task IDs in dictionaries follow the format:
+    - First 2-3 digits: Dataset ID (e.g., 10 for BABE)
+    - Last 2 digits: Subtask number (e.g., 01 for first subtask)
+    Example: "10001" = BABE dataset (10), first subtask (01)
+"""
 
 import os
 from enum import Enum
@@ -7,10 +26,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# WANDB
 WANDB_API_KEY = os.getenv("WANDB_API_KEY")
 
-# task specific configs
 
 dataset_id_to_dataset_name = {
     3: "CW_HARD",
@@ -23,14 +40,12 @@ dataset_id_to_dataset_name = {
     109: "Stereotype",
     116: "MDGender",
     128: "GWSD",
-
 }
 
 
 class TaskFamilies(Enum):
     """Task Families."""
 
-    # MLM = "Masked Language Modelling" dataset was not available
     SUBJECTIVITY = "Subjectivity"
     MEDIA_BIAS = "Media Bias"
     HATE_SPEECH = "Hate Speech"
@@ -55,42 +70,23 @@ dataset_id_to_family = {
     128: TaskFamilies.STANCE_DETECTION,
 }
 
-MAX_NUMBER_OF_STEPS = 200  # changed from 1000 to 100 for prefinetuning and 50 for finetuning for baseline
+MAX_NUMBER_OF_STEPS = 200  # changed from 1000 to 100 for pre-finetuning and 50 for finetuning for baseline
 
 # Task-configs
 MAX_LENGTH = 128
 
-# reproducibility
 RANDOM_SEED = 321
 
-# Split ratio for train/ dev/ test
 TRAIN_RATIO, DEV_RATIO, TEST_RATIO = 0.8, 0.1, 0.1
 
-# hyperparameter ranges for my hyperparameter tuning
+# hyperparameter ranges for hyperparameter tuning
 hyper_param_dict = {
     "dropout_prob": {"values": [0.1, 0.2, 0.3]},
     "sub_batch_size": {"values": [16, 32, 64]},
     "num_warmup_steps": {"values": [50, 100]},
 }
 
-# head specific batchsize for BABE subtasks
-head_specific_sub_batch_size = {
-    "300001": 32,
-    "10001": 64,
-    "10002": 32,
-    "10301": 32,
-    "10801": 32,
-    "10901": 32,
-    "10902": 32,
-    "11601": 32,
-    "42001": 32,
-    "42002": 32,
-    "12001": 32,
-    "12002": 32,
-    "12801": 32,
-}
-
-# TRAINING parameters - keeping only chosen task IDs
+# Head specific configurations
 head_specific_lr = {
     "300001": 0.0001,
     "10001": 3e-05,

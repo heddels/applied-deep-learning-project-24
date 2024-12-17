@@ -1,11 +1,37 @@
 """Training module for MTL model.
 
-Provides enhanced training_baseline functionality with:
-- Comprehensive error handling
-- Memory optimization
-- Detailed logging
-- Training efficiency improvements
+This module orchestrates the training of multiple tasks:
+
+                    Training Loop
+                         │
+                  Batch Processing
+                  /      │      \
+            Task A    Task B    Task C
+            /  \      /  \      /  \
+        Train  Val  Train Val  Train Val
+
+Key Components:
+1. Batch Management:
+   - Samples from all active tasks
+   - Handles different batch sizes
+   - Manages task scheduling
+
+2. Optimization:
+   - Two-stage updates (backbone + heads)
+   - Gradient scaling per task
+   - Learning rate scheduling
+   - Memory optimization
+
+3. Progress Tracking:
+   - Task state monitoring
+   - Performance metrics
+   - Resource utilization
+   - Training statistics
+
+Note: Tasks can transition between active, zombie, and dead states
+based on their performance during training.
 """
+
 import gc
 import statistics as stats
 import time
@@ -30,6 +56,7 @@ from ..utils.logger import general_logger
 
 class TrainerError(Exception):
     """Custom exception for training_baseline-related errors."""
+
     pass
 
 
@@ -44,27 +71,27 @@ class Trainer:
     """
 
     def __init__(
-            self,
-            task_list: List[Task],
-            initial_lr: float,
-            model_name: str,
-            max_steps: int,
-            pretrained_path: Optional[str],
-            sub_batch_size: int,
-            eval_batch_size: int,
-            early_stopping_mode,
-            resurrection: bool,
-            aggregation_method: AggregationMethod,
-            loss_scaling: LossScaling,
-            num_warmup_steps: int,
-            head_specific_lr_dict: Dict[str, float],
-            head_specific_patience_dict: Dict[str, int],
-            head_specific_max_epoch_dict: Dict[str, int],
-            logger: Logger,
-            device: Optional[torch.device] = None,
-            use_amp: bool = True,
-            *args,
-            **kwargs,
+        self,
+        task_list: List[Task],
+        initial_lr: float,
+        model_name: str,
+        max_steps: int,
+        pretrained_path: Optional[str],
+        sub_batch_size: int,
+        eval_batch_size: int,
+        early_stopping_mode,
+        resurrection: bool,
+        aggregation_method: AggregationMethod,
+        loss_scaling: LossScaling,
+        num_warmup_steps: int,
+        head_specific_lr_dict: Dict[str, float],
+        head_specific_patience_dict: Dict[str, int],
+        head_specific_max_epoch_dict: Dict[str, int],
+        logger: Logger,
+        device: Optional[torch.device] = None,
+        use_amp: bool = True,
+        *args,
+        **kwargs,
     ):
         """Initialize trainer with enhanced configuration."""
         try:
@@ -75,9 +102,17 @@ class Trainer:
             self.early_stopping_mode = early_stopping_mode
             self.loss_scaling = loss_scaling
             self.use_amp = use_amp and torch.cuda.is_available()
-            self.device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            self.device = device or torch.device(
+                "cuda" if torch.cuda.is_available() else "cpu"
+            )
 
-            self.model, batch_list_train, batch_list_dev, batch_list_eval, batch_list_test = ModelFactory(
+            (
+                self.model,
+                batch_list_train,
+                batch_list_dev,
+                batch_list_eval,
+                batch_list_test,
+            ) = ModelFactory(
                 task_list=task_list,
                 sub_batch_size=sub_batch_size,
                 eval_batch_size=eval_batch_size,
@@ -93,32 +128,47 @@ class Trainer:
             }
 
             # shared backbone model optimizer
-            self.lm_optimizer = torch.optim.AdamW(self.model.language_model.backbone.parameters(), lr=initial_lr)
+            self.lm_optimizer = torch.optim.AdamW(
+                self.model.language_model.backbone.parameters(), lr=initial_lr
+            )
             self.lm_lr_scheduler = get_polynomial_decay_schedule_with_warmup(
                 optimizer=self.lm_optimizer,
                 num_warmup_steps=num_warmup_steps,
-                num_training_steps=max([len(dl) for dl in self.batch_lists[Split.TRAIN].dataloaders.values()])
-                                   * stats.median(head_specific_max_epoch_dict.values()),
+                num_training_steps=max(
+                    [
+                        len(dl)
+                        for dl in self.batch_lists[Split.TRAIN].dataloaders.values()
+                    ]
+                )
+                * stats.median(head_specific_max_epoch_dict.values()),
             )
 
             # task-specifics optimizers
             self.head_optimizers = {
-                str(st_id): torch.optim.AdamW(head.parameters(), lr=head_specific_lr_dict[st_id])
+                str(st_id): torch.optim.AdamW(
+                    head.parameters(), lr=head_specific_lr_dict[st_id]
+                )
                 for st_id, head in self.model.heads.items()
             }
             self.head_lr_schedulers = {
                 str(st_id): get_polynomial_decay_schedule_with_warmup(
                     optimizer=self.head_optimizers[st_id],
                     num_warmup_steps=num_warmup_steps,
-                    num_training_steps=len(self.batch_lists[Split.TRAIN].dataloaders[st_id])
-                                       * head_specific_max_epoch_dict[st_id],
+                    num_training_steps=len(
+                        self.batch_lists[Split.TRAIN].dataloaders[st_id]
+                    )
+                    * head_specific_max_epoch_dict[st_id],
                 )
                 for st_id in self.model.heads.keys()
             }
 
             # flags controlling stopping and resurrection
-            self.task_alive_flags = {str(st_id): True for st_id in self.model.heads.keys()}
-            self.task_zombie_flags = {str(st_id): False for st_id in self.model.heads.keys()}
+            self.task_alive_flags = {
+                str(st_id): True for st_id in self.model.heads.keys()
+            }
+            self.task_zombie_flags = {
+                str(st_id): False for st_id in self.model.heads.keys()
+            }
             self.early_stopper = EarlyStopper(
                 st_ids=self.model.heads.keys(),
                 mode=self.early_stopping_mode,
@@ -129,9 +179,15 @@ class Trainer:
             # Initialize tracking components
             self.tracker = Tracker(heads=self.model.heads, logger=logger)
             self.GA = GradientAggregator(aggregation_method=aggregation_method)
-            self.progress_bar = tqdm(total=len(self.model.heads), desc="Training Progress")
+            self.progress_bar = tqdm(
+                total=len(self.model.heads), desc="Training Progress"
+            )
             self.model_name = model_name
-            self.scaling_weights = {str(st.id): st.get_scaling_weight() for t in task_list for st in t.subtasks_list}
+            self.scaling_weights = {
+                str(st.id): st.get_scaling_weight()
+                for t in task_list
+                for st in t.subtasks_list
+            }
             self.max_steps = max_steps
             self.k = 50
 
@@ -156,7 +212,7 @@ class Trainer:
             gc.collect()
 
             process = psutil.Process()
-            memory_info = process.memory_info().rss / 1024 ** 2  # Convert to MB
+            memory_info = process.memory_info().rss / 1024**2  # Convert to MB
             general_logger.debug(f"Current memory usage: {memory_info:.2f} MB")
 
         except Exception as e:
@@ -177,9 +233,13 @@ class Trainer:
             TrainerError: If optimization fails
         """
         try:
-            general_logger.info(f"Optimizing task {st_id}, alive: {self.task_alive_flags[st_id]}")
+            general_logger.info(
+                f"Optimizing task {st_id}, alive: {self.task_alive_flags[st_id]}"
+            )
             additional_payload = {}
-            last_dev_loss = self.tracker.get_last_st_loss(split=Split.DEV, st_id=st_id, k=self.k)
+            last_dev_loss = self.tracker.get_last_st_loss(
+                split=Split.DEV, st_id=st_id, k=self.k
+            )
 
             should_stop_now = (
                 self.early_stopper.early_stop(st_id=st_id, dev_loss=last_dev_loss)
@@ -189,21 +249,26 @@ class Trainer:
 
             should_resurrect_now = (
                 self.early_stopper.resurrect(st_id=st_id, dev_loss=last_dev_loss)
-                if (not self.task_zombie_flags[st_id] and not self.task_alive_flags[st_id])
+                if (
+                    not self.task_zombie_flags[st_id]
+                    and not self.task_alive_flags[st_id]
+                )
                 else False
             )
 
             should_stay_zombie = (
-                    not self.task_alive_flags[st_id] and
-                    self.task_zombie_flags[st_id] and
-                    not should_stop_now
+                not self.task_alive_flags[st_id]
+                and self.task_zombie_flags[st_id]
+                and not should_stop_now
             )
 
             # Handle task death
             if should_stop_now and self.task_alive_flags[st_id]:
                 general_logger.info(f"Subtask {st_id} is now DEAD.")
                 self.eval_st(split=Split.EVAL, st_id=st_id)
-                self.tracker.log(splits=[Split.EVAL], additional_payload={st_id + "_STOPPED": 0})
+                self.tracker.log(
+                    splits=[Split.EVAL], additional_payload={st_id + "_STOPPED": 0}
+                )
                 self.progress_bar.update()
 
             # Handle task resurrection
@@ -220,12 +285,16 @@ class Trainer:
 
             # Update task states
             self.task_alive_flags[st_id] = self.task_alive_flags[st_id] and not (
-                    should_stop_now or self.tracker.get_last_st_metric(split=Split.DEV, st_id=st_id, k=10) == 1
+                should_stop_now
+                or self.tracker.get_last_st_metric(split=Split.DEV, st_id=st_id, k=10)
+                == 1
             )
             self.task_zombie_flags[st_id] = should_resurrect_now or should_stay_zombie
 
             # Optimize if task is alive or zombie
-            optimize_task = self.task_alive_flags[str(st_id)] or self.task_zombie_flags[str(st_id)]
+            optimize_task = (
+                self.task_alive_flags[str(st_id)] or self.task_zombie_flags[str(st_id)]
+            )
             if optimize_task:
                 self.head_optimizers[st_id].step()
                 self.head_lr_schedulers[st_id].step()
@@ -255,9 +324,14 @@ class Trainer:
                 self.model.language_model.set_grads(aggregated_gradients)
                 self.lm_optimizer.step()
                 self.lm_lr_scheduler.step()
-            if self.GA.aggregation_method in [AggregationMethod.PCGRAD, AggregationMethod.PCGRAD_ONLINE]:
+            if self.GA.aggregation_method in [
+                AggregationMethod.PCGRAD,
+                AggregationMethod.PCGRAD_ONLINE,
+            ]:
                 conflicting_gradients_ratio = self.GA.get_conflicting_gradients_ratio()
-                additional_payload["conflicting_gradients_ratio"] = conflicting_gradients_ratio
+                additional_payload["conflicting_gradients_ratio"] = (
+                    conflicting_gradients_ratio
+                )
         except Exception as e:
             raise TrainerError(f"Failed to do backbone optimization: {str(e)}")
         return additional_payload
@@ -302,8 +376,7 @@ class Trainer:
 
                 # Forward pass and compute loss
                 loss, metric_values, lm_grads = self._step(
-                    (X, attention_masks, Y, st_id.unique()),
-                    training=training
+                    (X, attention_masks, Y, st_id.unique()), training=training
                 )
 
                 scaling_weight = (
@@ -316,14 +389,18 @@ class Trainer:
                     payload = self.head_specific_optimization(
                         st_id=st_id_str,
                         lm_grads=lm_grads,
-                        scaling_weight=scaling_weight
+                        scaling_weight=scaling_weight,
                     )
                     additional_payloads.update(payload)
 
                 # Update metrics and losses
                 for metric, value in metric_values.items():
-                    self.tracker.update_metric(split=split, st_id=st_id_str, metric=metric, value=value)
-                self.tracker.update_loss(split=split, st_id=st_id_str, value=loss.item())
+                    self.tracker.update_metric(
+                        split=split, st_id=st_id_str, metric=metric, value=value
+                    )
+                self.tracker.update_loss(
+                    split=split, st_id=st_id_str, value=loss.item()
+                )
                 losses.append(loss.item())
 
             if training:
@@ -346,7 +423,7 @@ class Trainer:
             "X": batch[0].to(self.device),
             "attention_masks": batch[1].to(self.device),
             "Y": batch[2].to(self.device),
-            "st_id": batch[3]
+            "st_id": batch[3],
         }
 
         try:
@@ -381,7 +458,9 @@ class Trainer:
     def fit_debug(self, k: int):
         """Fit for k iterations only to check if a model can process the data."""
         try:
-            general_logger.info(f"Starting the debug training_baseline for {k} iterations")
+            general_logger.info(
+                f"Starting the debug training_baseline for {k} iterations"
+            )
             step = 0
             for _ in range(k):
                 step += 1
@@ -397,13 +476,17 @@ class Trainer:
     def fit(self):
         """Train the model."""
         try:
-            general_logger.info(f"Starting training_baseline with MAX_STEPS: {self.max_steps}")
+            general_logger.info(
+                f"Starting training_baseline with MAX_STEPS: {self.max_steps}"
+            )
             general_logger.info(f"Initial task states: {self.task_alive_flags}")
             step = 0
 
             while step < self.max_steps:
                 if not any(self.task_alive_flags.values()):
-                    general_logger.info("No tasks remaining alive, stopping training_baseline")
+                    general_logger.info(
+                        "No tasks remaining alive, stopping training_baseline"
+                    )
                     break
 
                 step += 1
@@ -420,10 +503,7 @@ class Trainer:
                     splits_to_log.append(Split.DEV)
 
                 self._update_progress()
-                self.tracker.log(
-                    splits=splits_to_log,
-                    additional_payload=train_payload
-                )
+                self.tracker.log(splits=splits_to_log, additional_payload=train_payload)
 
                 # Periodic memory optimization
                 if step % 100 == 0:

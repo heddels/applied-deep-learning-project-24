@@ -1,8 +1,14 @@
 """Training utilities module for MTL training_baseline.
 
 Contains utility classes for:
-- Logging
-- Early stopping
+1. Logging: Tracks metrics, losses and artifacts across multiple tasks
+   - Uses both file-based logging and wandb for experiment tracking
+   - Provides consistent logging interface across training components
+
+2. Early Stopping: Manages training termination across multiple tasks
+   - Supports independent stopping criteria for each task
+   - Implements "zombie" task resurrection for potential recovery
+   - Allows different stopping strategies via configurable modes
 
 """
 
@@ -25,7 +31,9 @@ class Logger:
         os.makedirs(PATH, exist_ok=True)
 
         self.experiment_logfilename = PATH + "/train_data.log"
-        experiment_logfile_handler = logging.FileHandler(filename=self.experiment_logfilename)
+        experiment_logfile_handler = logging.FileHandler(
+            filename=self.experiment_logfilename
+        )
         experiment_logfile_formatter = logging.Formatter(fmt="%(message)s")
         experiment_logfile_handler.setFormatter(experiment_logfile_formatter)
 
@@ -43,6 +51,7 @@ class Logger:
 
 class EarlyStoppingMode(Enum):
     """Mode for early stopping behavior."""
+
     HEADS = "heads"  # Only stop heads
     BACKBONE = "backbone"  # Also stop backbone
     NONE = "none"  # No early stopping
@@ -52,11 +61,11 @@ class EarlyStopperSingle:
     """Early stopping tracker for a single model component."""
 
     def __init__(
-            self,
-            patience: int,
-            min_delta: float,
-            resurrection: bool,
-            zombie_patience: int = 10
+        self,
+        patience: int,
+        min_delta: float,
+        resurrection: bool,
+        zombie_patience: int = 10,
     ):
         """Initialize early stopping tracker.
 
@@ -71,8 +80,8 @@ class EarlyStopperSingle:
         self.min_delta = min_delta
         self.counter = 0
         self.counter_zombie = 0
-        self.min_dev_loss = float('inf')
-        self.min_dev_loss_zombie = float('inf')
+        self.min_dev_loss = float("inf")
+        self.min_dev_loss_zombie = float("inf")
         self.resurrection = resurrection
 
     def early_stop(self, dev_loss: float) -> bool:
@@ -121,20 +130,20 @@ class EarlyStopperSingle:
         """Reset early stopping state."""
         self.counter_zombie = 0
         self.counter = 0
-        self.min_dev_loss_zombie = float('inf')
-        self.min_dev_loss = float('inf')
+        self.min_dev_loss_zombie = float("inf")
+        self.min_dev_loss = float("inf")
 
 
 class EarlyStopper:
     """Container for managing multiple early stoppers."""
 
     def __init__(
-            self,
-            st_ids: List[str],
-            mode: EarlyStoppingMode,
-            patience: Dict[str, int],
-            resurrection: bool,
-            min_delta: float = 0
+        self,
+        st_ids: List[str],
+        mode: EarlyStoppingMode,
+        patience: Dict[str, int],
+        resurrection: bool,
+        min_delta: float = 0,
     ):
         """Initialize early stopping manager.
 
@@ -148,27 +157,25 @@ class EarlyStopper:
         self.mode = mode
         self.early_stoppers = {
             st_id: EarlyStopperSingle(
-                patience=patience[st_id],
-                min_delta=min_delta,
-                resurrection=resurrection
+                patience=patience[st_id], min_delta=min_delta, resurrection=resurrection
             )
             for st_id in st_ids
         }
-        general_logger.info(
-            f"Initialized early stopping manager with mode {mode}"
-        )
+        general_logger.info(f"Initialized early stopping manager with mode {mode}")
 
     def early_stop(self, st_id: str, dev_loss: float) -> bool:
         """Check if specific task should stop."""
         return (
-            False if self.mode == EarlyStoppingMode.NONE
+            False
+            if self.mode == EarlyStoppingMode.NONE
             else self.early_stoppers[st_id].early_stop(dev_loss=dev_loss)
         )
 
     def resurrect(self, st_id: str, dev_loss: float) -> bool:
         """Check if specific task should resurrect."""
         return (
-            False if self.mode == EarlyStoppingMode.NONE
+            False
+            if self.mode == EarlyStoppingMode.NONE
             else self.early_stoppers[st_id].resurrect(dev_loss=dev_loss)
         )
 

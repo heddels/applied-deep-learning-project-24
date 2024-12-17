@@ -1,7 +1,26 @@
 """Metrics tracking and computation module.
 
-This module provides classes and utilities for tracking metrics during training_baseline,
-computing running averages, and managing metric history.
+This module tracks how well the model is performing during training:
+
+1. Metric Types:
+   Model Performance       Training Progress
+   ├─ Accuracy            ├─ Losses
+   ├─ F1 Score           └─ Learning Rate
+   └─ Task-specific
+
+2. Features:
+   - Running averages for stable tracking
+   - Separate tracking per task
+   - History saving/loading
+   - Best value tracking
+
+3. Data Organization:
+   Split (train/dev/test)
+   └─ Task
+      └─ Metrics
+         ├─ Accuracy
+         ├─ Loss
+         └─ F1 Score
 """
 
 import json
@@ -16,6 +35,7 @@ from ..utils.logger import general_logger
 
 class MetricError(Exception):
     """Custom exception for metric-related errors."""
+
     pass
 
 
@@ -189,11 +209,7 @@ class Tracker:
             return "No metrics available"
 
     def update_metric(
-            self,
-            split: Split,
-            st_id: str,
-            metric: str,
-            value: float
+        self, split: Split, st_id: str, metric: str, value: float
     ) -> None:
         """Update a specific metric value.
 
@@ -210,18 +226,16 @@ class Tracker:
             if split == Split.DEV:
                 metric_key = f"{st_id}_{metric}"
                 current_value = value
-                if metric_key not in self.best_metrics or current_value > self.best_metrics[metric_key]:
+                if (
+                    metric_key not in self.best_metrics
+                    or current_value > self.best_metrics[metric_key]
+                ):
                     self.best_metrics[metric_key] = current_value
 
         except Exception as e:
             raise MetricError(f"Failed to update metric: {str(e)}")
 
-    def update_loss(
-            self,
-            split: Split,
-            st_id: str,
-            value: float
-    ) -> None:
+    def update_loss(self, split: Split, st_id: str, value: float) -> None:
         """Update a specific loss value.
 
         Args:
@@ -234,11 +248,7 @@ class Tracker:
         except Exception as e:
             raise MetricError(f"Failed to update loss: {str(e)}")
 
-    def update_combined_loss(
-            self,
-            split: Split,
-            value: float
-    ) -> None:
+    def update_combined_loss(self, split: Split, value: float) -> None:
         """Update combined loss for a split.
 
         Args:
@@ -250,12 +260,7 @@ class Tracker:
         except Exception as e:
             raise MetricError(f"Failed to update combined loss: {str(e)}")
 
-    def get_last_st_loss(
-            self,
-            split: Split,
-            st_id: str,
-            k: int
-    ) -> float:
+    def get_last_st_loss(self, split: Split, st_id: str, k: int) -> float:
         """Get mean of last k loss values for a subtask.
 
         Args:
@@ -271,12 +276,7 @@ class Tracker:
         except Exception as e:
             raise MetricError(f"Failed to get subtask loss: {str(e)}")
 
-    def get_last_st_metric(
-            self,
-            split: Split,
-            st_id: str,
-            k: int
-    ) -> float:
+    def get_last_st_metric(self, split: Split, st_id: str, k: int) -> float:
         """Get mean of last k metric values for a subtask.
 
         Args:
@@ -295,9 +295,7 @@ class Tracker:
             raise MetricError(f"Failed to get subtask metric: {str(e)}")
 
     def log(
-            self,
-            splits: List[Split],
-            additional_payload: Optional[Dict[str, float]] = None
+        self, splits: List[Split], additional_payload: Optional[Dict[str, float]] = None
     ) -> None:
         """Log metrics and losses.
 
@@ -310,9 +308,13 @@ class Tracker:
 
             for split in splits:
                 # Check if we have any values before trying to log
-                if not any(any(m.values for m in d.values())
-                           for d in self.metrics[split].values()):
-                    general_logger.warning(f"No metrics recorded for split {split}, skipping logging")
+                if not any(
+                    any(m.values for m in d.values())
+                    for d in self.metrics[split].values()
+                ):
+                    general_logger.warning(
+                        f"No metrics recorded for split {split}, skipping logging"
+                    )
                     continue
                 # For training_baseline and validation, log last values
                 if split in [Split.DEV, Split.TRAIN]:
@@ -325,8 +327,7 @@ class Tracker:
                     # Log losses
                     combined_loss = self.combined_losses[split].mean_last_k(1)
                     losses = {
-                        v.name: v.mean_last_k(1)
-                        for v in self.losses[split].values()
+                        v.name: v.mean_last_k(1) for v in self.losses[split].values()
                     }
                 # For test and eval, log means
                 else:
@@ -338,10 +339,7 @@ class Tracker:
                     }
                     # Log losses
                     combined_loss = self.combined_losses[split].mean_all()
-                    losses = {
-                        v.name: v.mean_all()
-                        for v in self.losses[split].values()
-                    }
+                    losses = {v.name: v.mean_all() for v in self.losses[split].values()}
 
                 out.update(metrics)
                 out[f"combined_{split.value}_loss"] = combined_loss
@@ -362,7 +360,7 @@ class Tracker:
         try:
             path = Path(path)
             history = {
-                'metrics': {
+                "metrics": {
                     split.value: {
                         st_id: {
                             metric: meter.get_history()
@@ -372,21 +370,21 @@ class Tracker:
                     }
                     for split, split_metrics in self.metrics.items()
                 },
-                'losses': {
+                "losses": {
                     split.value: {
                         st_id: meter.get_history()
                         for st_id, meter in split_losses.items()
                     }
                     for split, split_losses in self.losses.items()
                 },
-                'combined_losses': {
+                "combined_losses": {
                     split.value: meter.get_history()
                     for split, meter in self.combined_losses.items()
                 },
-                'best_metrics': self.best_metrics
+                "best_metrics": self.best_metrics,
             }
 
-            with open(path, 'w') as f:
+            with open(path, "w") as f:
                 json.dump(history, f, indent=2)
 
             general_logger.info(f"Saved metric history to {path}")
@@ -406,7 +404,7 @@ class Tracker:
                 history = json.load(f)
 
             # Restore metrics
-            for split_name, split_metrics in history['metrics'].items():
+            for split_name, split_metrics in history["metrics"].items():
                 split = Split(split_name)
                 for st_id, st_metrics in split_metrics.items():
                     for metric, values in st_metrics.items():
@@ -414,20 +412,20 @@ class Tracker:
                             self.metrics[split][st_id][metric].update(value)
 
             # Restore losses
-            for split_name, split_losses in history['losses'].items():
+            for split_name, split_losses in history["losses"].items():
                 split = Split(split_name)
                 for st_id, values in split_losses.items():
                     for value in values:
                         self.losses[split][st_id].update(value)
 
             # Restore combined losses
-            for split_name, values in history['combined_losses'].items():
+            for split_name, values in history["combined_losses"].items():
                 split = Split(split_name)
                 for value in values:
                     self.combined_losses[split].update(value)
 
             # Restore best metrics
-            self.best_metrics = history['best_metrics']
+            self.best_metrics = history["best_metrics"]
 
             general_logger.info(f"Loaded metric history from {path}")
 

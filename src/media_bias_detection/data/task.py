@@ -1,7 +1,32 @@
 """Task module containing base classes for tasks and subtasks.
 
-This module implements the core task and subtask functionality for the MTL model,
-including data loading, processing, and task-specific operations.
+This module implements the core task hierarchy for the MTL model. It provides:
+
+1. Base Classes:
+   - Task: Container for related subtasks (e.g., BABE dataset tasks)
+   - SubTask: Abstract base class defining common task behavior
+   - Specialized subtask types:
+     * ClassificationSubTask: Binary/multiclass classification
+     * MultiLabelClassificationSubTask: Multiple label prediction
+     * POSSubTask: Part-of-speech/token-level classification
+
+2. Data Processing:
+   - Automatic data loading and preprocessing
+   - Train/dev/test splitting
+   - Token alignment for POS tasks
+   - Class weight computation for imbalanced datasets
+
+3. Key Features:
+   - Consistent interface across task types
+   - Automatic handling of attention masks
+   - Support for debugging with reduced dataset sizes
+   - Class weight balancing for imbalanced tasks
+
+Architecture Notes:
+- Tasks contain one or more subtasks
+- All subtasks inherit from SubTask base class
+- Each subtask type implements its own data loading logic
+- POS tasks require special token alignment handling
 """
 
 import os
@@ -22,6 +47,7 @@ from ..tokenizer import tokenizer
 
 class DataProcessingError(Exception):
     """Custom exception for data processing errors."""
+
     pass
 
 
@@ -134,10 +160,12 @@ class Task:
         subtasks_list: List of subtasks belonging to this task
     """
 
-    def __init__(self, task_id: int, subtasks_list: List['SubTask']):
+    def __init__(self, task_id: int, subtasks_list: List["SubTask"]):
         self.task_id = task_id
         self.subtasks_list = subtasks_list
-        general_logger.info(f"Initialized Task {task_id} with {len(subtasks_list)} subtasks")
+        general_logger.info(
+            f"Initialized Task {task_id} with {len(subtasks_list)} subtasks"
+        )
 
     def __repr__(self) -> str:
         return f"Task {self.task_id} with {len(self.subtasks_list)} subtask{'s' if len(self.subtasks_list) > 1 else ''}"
@@ -158,12 +186,12 @@ class SubTask:
     """
 
     def __init__(
-            self,
-            id: int,
-            task_id: int,
-            filename: str,
-            src_col: str = "text",
-            tgt_cols_list: List[str] = ["label"],
+        self,
+        id: int,
+        task_id: int,
+        filename: str,
+        src_col: str = "text",
+        tgt_cols_list: List[str] = ["label"],
     ):
         if type(self) == SubTask:
             raise RuntimeError("Abstract class <SubTask> must not be instantiated.")
@@ -207,16 +235,22 @@ class SubTask:
             train_split = int(len(X) * TRAIN_RATIO)
             dev_split = train_split + int(len(X) * DEV_RATIO)
 
-            self.X = {Split.TRAIN: X[:train_split], Split.DEV: X[train_split:dev_split],
-                      Split.TEST: X[dev_split:]}
+            self.X = {
+                Split.TRAIN: X[:train_split],
+                Split.DEV: X[train_split:dev_split],
+                Split.TEST: X[dev_split:],
+            }
 
             self.attention_masks = {
                 Split.TRAIN: attention_masks[:train_split],
                 Split.DEV: attention_masks[train_split:dev_split],
                 Split.TEST: attention_masks[dev_split:],
             }
-            self.Y = {Split.TRAIN: Y[:train_split], Split.DEV: Y[train_split:dev_split],
-                      Split.TEST: Y[dev_split:]}
+            self.Y = {
+                Split.TRAIN: Y[:train_split],
+                Split.DEV: Y[train_split:dev_split],
+                Split.TEST: Y[dev_split:],
+            }
 
             self.create_class_weights()
 
@@ -275,17 +309,22 @@ class ClassificationSubTask(SubTask):
         super(ClassificationSubTask, self).__init__(*args, **kwargs)
         self.num_classes = num_classes
 
-    def load_data(self, debug: bool = False) -> Tuple[torch.LongTensor, torch.LongTensor, torch.LongTensor]:
+    def load_data(
+        self, debug: bool = False
+    ) -> Tuple[torch.LongTensor, torch.LongTensor, torch.LongTensor]:
         """Load the data of a ClassificationSubTask."""
         df = pd.read_csv(self.filename)
         if debug:
             # Take only first 100 samples for debugging
             df = df.head(100)
-            general_logger.info(f"Debug mode: Using {len(df)} samples for subtask {self.id}")
+            general_logger.info(
+                f"Debug mode: Using {len(df)} samples for subtask {self.id}"
+            )
 
         X, Y = df[self.src_col], df[self.tgt_cols_list]
-        tokenized_inputs = tokenizer(X.to_list(), padding="max_length", truncation=True,
-                                     max_length=MAX_LENGTH)
+        tokenized_inputs = tokenizer(
+            X.to_list(), padding="max_length", truncation=True, max_length=MAX_LENGTH
+        )
         X = tokenized_inputs.get("input_ids")
         attention_masks = tokenized_inputs.get("attention_mask")
         assert Y.nunique().squeeze() == self.num_classes
@@ -294,7 +333,11 @@ class ClassificationSubTask(SubTask):
             Y = Y.to_numpy()
         else:
             Y = Y[self.tgt_cols_list].to_numpy()
-        return torch.LongTensor(X), torch.LongTensor(Y), torch.LongTensor(attention_masks)
+        return (
+            torch.LongTensor(X),
+            torch.LongTensor(Y),
+            torch.LongTensor(attention_masks),
+        )
 
     def __repr__(self):
         """Represent a Classification Subtask."""
@@ -322,20 +365,25 @@ class MultiLabelClassificationSubTask(SubTask):
         self.num_classes = num_classes
         self.num_labels = num_labels
 
-    def load_data(self, debug: bool = False) -> Tuple[torch.LongTensor, torch.LongTensor, torch.LongTensor]:
+    def load_data(
+        self, debug: bool = False
+    ) -> Tuple[torch.LongTensor, torch.LongTensor, torch.LongTensor]:
         """Load the data of a MultiLabelClassificationSubTask."""
         df = pd.read_csv(self.filename)
         if debug:
             # Take only first 100 samples for debugging
             df = df.head(100)
-            general_logger.info(f"Debug mode: Using {len(df)} samples for subtask {self.id}")
+            general_logger.info(
+                f"Debug mode: Using {len(df)} samples for subtask {self.id}"
+            )
 
         # X = df[self.src_col].tolist()
         # Y = df[self.tgt_cols_list].values
         X, Y = df[self.src_col], df[self.tgt_cols_list]
 
-        tokenized_inputs = tokenizer(X.tolist(), padding="max_length", truncation=True,
-                                     max_length=MAX_LENGTH)
+        tokenized_inputs = tokenizer(
+            X.tolist(), padding="max_length", truncation=True, max_length=MAX_LENGTH
+        )
         X = torch.LongTensor(tokenized_inputs.get("input_ids"))
         attention_masks = torch.LongTensor(tokenized_inputs.get("attention_mask"))
         assert Y.max(axis=0).to_numpy().max() == 1
@@ -377,33 +425,51 @@ class POSSubTask(SubTask):
         assert len(tgt_cols_list) == 1
         super(POSSubTask, self).__init__(tgt_cols_list=tgt_cols_list, *args, **kwargs)
 
-    def load_data(self, debug: bool = False) -> Tuple[torch.LongTensor, torch.LongTensor, torch.LongTensor]:
+    def load_data(
+        self, debug: bool = False
+    ) -> Tuple[torch.LongTensor, torch.LongTensor, torch.LongTensor]:
         """Load the data of a POSSubTask."""
         df = pd.read_csv(self.filename)
         if debug:
             # Take only first 100 samples for debugging
             df = df.head(100)
-            general_logger.info(f"Debug mode: Using {len(df)} samples for subtask {self.id}")
+            general_logger.info(
+                f"Debug mode: Using {len(df)} samples for subtask {self.id}"
+            )
 
         df[self.tgt_cols_list] = df[self.tgt_cols_list].fillna("")
         mask = df.apply(
-            lambda row: all([p in row[self.src_col] for p in row[self.tgt_cols_list[0]].split(";")]), axis=1
+            lambda row: all(
+                [p in row[self.src_col] for p in row[self.tgt_cols_list[0]].split(";")]
+            ),
+            axis=1,
         )
         df = df[mask].reset_index(drop=True)
-        assert sum(mask) == len(df[self.tgt_cols_list]), "At least one POS is not contained in the source column."
+        assert sum(mask) == len(
+            df[self.tgt_cols_list]
+        ), "At least one POS is not contained in the source column."
 
-        pos_list_list = df[self.tgt_cols_list[0]].apply(lambda x: x.split(";")).to_list()
+        pos_list_list = (
+            df[self.tgt_cols_list[0]].apply(lambda x: x.split(";")).to_list()
+        )
         X = df[self.src_col].values
         # If we do not provide a labels column, we assume that, whenever a pos is present, that is the non-neutral class
         labels = (
             df[self.label_col]
             if self.label_col
-            else [1 if len(pos) > 0 else 0 for pos in df[self.tgt_cols_list[0]].to_list()]
+            else [
+                1 if len(pos) > 0 else 0 for pos in df[self.tgt_cols_list[0]].to_list()
+            ]
         )
-        tokens, labels = get_tokens_and_labels(pos_list_list=pos_list_list, text_list=X, labels=labels)
+        tokens, labels = get_tokens_and_labels(
+            pos_list_list=pos_list_list, text_list=X, labels=labels
+        )
         tokenized_inputs = tokenizer(
-            tokens, padding="max_length", is_split_into_words=True, truncation=True,
-            max_length=MAX_LENGTH
+            tokens,
+            padding="max_length",
+            is_split_into_words=True,
+            truncation=True,
+            max_length=MAX_LENGTH,
         )
         new_labels = []
         for i, labels in enumerate(labels):
@@ -415,7 +481,11 @@ class POSSubTask(SubTask):
         self.num_classes = len(np.unique(Y)) - 1
         X = tokenized_inputs.get("input_ids")
         attention_masks = tokenized_inputs.get("attention_mask")
-        return torch.LongTensor(X), torch.LongTensor(Y), torch.LongTensor(attention_masks)
+        return (
+            torch.LongTensor(X),
+            torch.LongTensor(Y),
+            torch.LongTensor(attention_masks),
+        )
 
     def __repr__(self):
         """Represent a Token-level classification Subtask."""

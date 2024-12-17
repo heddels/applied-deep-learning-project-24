@@ -12,23 +12,18 @@ setup(
         "torch>=2.0.0",
         "transformers>=4.30.0",
         "torchmetrics>=1.0.0",
-
         # Data Processing
         "numpy>=1.24.0",
         "pandas>=2.0.0",
         "scipy>=1.10.0",
         "statistics>=1.0.0",
-
         # Tokenization
         "tokenizers>=0.13.0",  # Added - needed for DistilBertTokenizerFast
-
         # Experiment Tracking
         "wandb>=0.15.0",
         "tqdm>=4.65.0",
-
         # System & Memory
         "psutil>=5.9.0",
-
         # Configuration & Utils
         "python-dotenv>=1.0.0",
         "pyyaml>=6.0",

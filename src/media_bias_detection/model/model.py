@@ -1,4 +1,28 @@
-"""Main MTL model implementation."""
+"""Main MTL model implementation.
+
+This module implements the core Multi-Task Learning (MTL) model architecture:
+
+                      Shared Backbone
+                           │
+                    Text Embeddings
+                    /      │      \
+                Head 1  Head 2  Head 3
+                (Bias) (Hate)  (Gender)
+
+The model consists of:
+1. A shared DistilBERT backbone that processes text input
+2. Multiple task-specific heads for different types of bias detection
+3. Device management for CPU/GPU training
+
+Key Features:
+- Automatic head creation for different task types
+- Shared parameter learning across tasks
+- Memory-efficient device handling
+- Forward pass with task-specific routing
+
+Note: Each head gets the same backbone features but processes them
+differently based on its task (e.g., bias detection vs hate speech).
+"""
 
 from typing import List
 
@@ -26,17 +50,23 @@ class Model(nn.Module):
         self.stl = stl
         self.subtask_id_to_subtask = {int(f"{st.id}"): st for st in stl}
         # Setup device
-        self.device = torch.device("cuda" if torch.cuda.is_available() else torch.device("cpu"))
+        self.device = torch.device(
+            "cuda" if torch.cuda.is_available() else torch.device("cpu")
+        )
 
         # Initialize backbone
         self.language_model = BackboneLM()
         self.language_model.backbone.resize_token_embeddings(len(tokenizer))
         # Initialize heads
-        self.heads = nn.ModuleDict({str(st.id): HeadFactory(st, *args, **kwargs) for st in stl})
+        self.heads = nn.ModuleDict(
+            {str(st.id): HeadFactory(st, *args, **kwargs) for st in stl}
+        )
 
         # Move model to device
         self.to(self.device)
-        general_logger.info(f"Initialized model with {len(self.heads)} heads on {self.device}")
+        general_logger.info(
+            f"Initialized model with {len(self.heads)} heads on {self.device}"
+        )
 
     def forward(self, X, attention_masks, Y, st_id):
         """Pass data through model and task-specific head.
@@ -53,8 +83,7 @@ class Model(nn.Module):
         # Pass through backbone
         with torch.set_grad_enabled(self.training):
             x_enc = self.language_model.backbone(
-                input_ids=X,
-                attention_mask=attention_masks
+                input_ids=X, attention_mask=attention_masks
             ).last_hidden_state
 
             # Pass through task-specific head

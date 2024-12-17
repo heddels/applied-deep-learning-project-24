@@ -1,3 +1,15 @@
+"""Basic debug script for initial model testing.
+
+Quick validation of model functionality by:
+1. Running single training iteration
+2. Testing with subset of tasks
+3. Checking evaluation pipeline
+4. Verifying wandb logging
+
+Used as first check before running longer training sessions
+to catch basic setup issues early.
+"""
+
 import os
 
 import wandb
@@ -6,7 +18,7 @@ from media_bias_detection.config.config import (
     MAX_NUMBER_OF_STEPS,
     head_specific_lr,
     head_specific_max_epoch,
-    head_specific_patience
+    head_specific_patience,
 )
 from media_bias_detection.data import test_tasks, test_subtasks
 from media_bias_detection.training.trainer import Trainer
@@ -56,11 +68,7 @@ def main():
 
     try:
         # Initialize wandb
-        wandb.init(
-            project=EXPERIMENT_NAME,
-            name=MODEL_NAME,
-            config=config
-        )
+        wandb.init(project=EXPERIMENT_NAME, name=MODEL_NAME, config=config)
 
         # Create trainer
         trainer = Trainer(task_list=selected_tasks, **config)

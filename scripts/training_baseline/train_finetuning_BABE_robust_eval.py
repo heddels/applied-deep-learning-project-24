@@ -1,4 +1,13 @@
-"""Script for executing the finetuning and evaluation on BABE."""
+"""Finetuning script for BABE task using pre-trained model.
+
+Loads pre-trained model and finetunes on BABE dataset:
+1. Uses pre-trained weights from model_files/
+2. Runs short training (50 steps) for quick results
+3. Evaluates on test split
+4. Logs metrics to wandb
+
+Baseline finetuning run to validate transfer learning approach.
+"""
 
 import os
 
@@ -7,7 +16,7 @@ import wandb
 from media_bias_detection.config.config import (
     head_specific_lr,
     head_specific_max_epoch,
-    head_specific_patience
+    head_specific_patience,
 )
 from media_bias_detection.data import st_1_babe_10 as babe
 from media_bias_detection.data.task import Task
@@ -56,7 +65,6 @@ def main():
         trainer = Trainer(task_list=tasks, **config)
         trainer.fit()
         trainer.eval(split=Split.TEST)
-
 
     except Exception as e:
         print(f"Finetuning with BABE failed with error: {str(e)}")

@@ -1,10 +1,23 @@
-"""Tokenizer module providing a singleton tokenizer instance."""
+"""Tokenizer module for text preprocessing.
+
+Provides a single tokenizer instance used throughout the model to:
+1. Convert text to tokens
+2. Maintain consistent vocabulary
+3. Prevent duplicate tokenizer creation
+
+The tokenizer is created once and shared across all model components
+to save memory and ensure consistent processing.
+"""
 
 from transformers import DistilBertTokenizerFast
 
 
 class Tokenizer:
-    """Singleton class to maintain a single tokenizer instance."""
+    """Manages a single shared tokenizer instance.
+
+    Uses DistilBERT's uncased tokenizer as base implementation.
+    Created once on first use, then reused for all subsequent calls.
+    """
 
     _instance = None
     _tokenizer = None
@@ -12,7 +25,9 @@ class Tokenizer:
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(Tokenizer, cls).__new__(cls)
-            cls._tokenizer = DistilBertTokenizerFast.from_pretrained('distilbert-base-uncased')
+            cls._tokenizer = DistilBertTokenizerFast.from_pretrained(
+                "distilbert-base-uncased"
+            )
         return cls._instance
 
     def __len__(self):

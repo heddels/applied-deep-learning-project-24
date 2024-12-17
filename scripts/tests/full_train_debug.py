@@ -1,3 +1,18 @@
+"""Debug script for testing task death handling in MTL model.
+
+Tests the model's ability to handle failing tasks by:
+1. Running with small test tasks
+2. Using debug mode for data processing
+3. Monitoring task states and transitions
+4. Evaluating final performance
+
+Configuration uses minimal settings to quickly test task death:
+- Small batch sizes
+- Few warmup steps
+- Limited training steps
+- Basic gradient handling
+"""
+
 import os
 from pathlib import Path
 from typing import Dict
@@ -17,7 +32,7 @@ head_specific_patience: Dict[str, int] = {
     "300001": 1,  # CW_HARD task
     "10801": 2,  # MeTooMA task
     "42001": 3,  # GoodNewsEveryone task 1
-    "42002": 3  # GoodNewsEveryone task 2
+    "42002": 3,  # GoodNewsEveryone task 2
 }
 
 # Dictionary mapping subtask IDs to their maximum epochs
@@ -25,7 +40,7 @@ head_specific_max_epoch: Dict[str, int] = {
     "300001": 1,  # CW_HARD task
     "10801": 2,  # MeTooMA task
     "42001": 3,  # GoodNewsEveryone task 1
-    "42002": 3  # GoodNewsEveryone task 2
+    "42002": 3,  # GoodNewsEveryone task 2
 }
 
 
@@ -62,7 +77,7 @@ def main():
         "head_specific_max_epoch_dict": head_specific_max_epoch,
         "model_name": MODEL_NAME,
         "max_steps": MAX_NUMBER_OF_STEPS,
-        "logger": Logger(EXPERIMENT_NAME)
+        "logger": Logger(EXPERIMENT_NAME),
     }
 
     # Set random seed for reproducibility

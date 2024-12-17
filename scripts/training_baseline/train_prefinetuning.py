@@ -1,4 +1,14 @@
-"""Script for executing the pre-finetuning on the subtasks excluding BABE with 100 Steps."""
+"""Pre-finetuning script for all tasks except BABE.
+
+Initial training phase:
+1. Trains on all tasks except BABE
+2. Uses PCGrad for gradient handling
+3. Runs for 100 steps (shortened from 1000)
+4. Saves model for later BABE finetuning
+
+Creates baseline model for transfer learning to BABE task.
+Saved to model_files/pre_finetuned_model.pth
+"""
 
 import os
 
@@ -7,7 +17,7 @@ import wandb
 from media_bias_detection.config.config import (
     head_specific_lr,
     head_specific_max_epoch,
-    head_specific_patience
+    head_specific_patience,
 )
 from media_bias_detection.data import all_tasks, babe_10
 from media_bias_detection.training.trainer import Trainer

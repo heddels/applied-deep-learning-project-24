@@ -1,7 +1,24 @@
 """Gradient handling module for MTL optimization.
 
-This module provides classes for gradient manipulation, accumulation,
-and conflict resolution in multi-task learning settings.
+This module manages how gradients from different tasks work together:
+
+Problem: Different tasks may want to update the shared model in conflicting ways.
+Solution: Smart gradient combination methods that balance these conflicts.
+
+Key Components:
+1. Gradient Collection:
+   - GradsWrapper: Gets/sets gradients for model parts
+   - Accumulators: Store and combine gradients
+
+2. Gradient Handling Methods:
+   - Mean: Simple averaging of gradients
+   - PCGrad: Projects conflicting gradients
+   - PCGrad-Online: Streaming version of PCGrad
+
+3. Conflict Resolution:
+   - Detects when tasks conflict
+   - Adjusts gradients to reduce conflicts
+   - Tracks conflict statistics
 """
 
 import copy
@@ -18,6 +35,7 @@ from media_bias_detection.utils.logger import general_logger
 
 class GradientError(Exception):
     """Custom exception for gradient-related errors."""
+
     pass
 
 
@@ -27,7 +45,9 @@ class GradsWrapper(nn.Module):
     def __init__(self, *args, **kwargs):
         """Initialize GradsWrapper."""
         if type(self) == GradsWrapper:
-            raise RuntimeError("Abstract class <GradsWrapper> must not be instantiated.")
+            raise RuntimeError(
+                "Abstract class <GradsWrapper> must not be instantiated."
+            )
         super().__init__()
         general_logger.debug("Initialized GradsWrapper")
 
@@ -52,6 +72,7 @@ class GradsWrapper(nn.Module):
 
 class AccumulatorError(Exception):
     """Custom exception for accumulator-related errors."""
+
     pass
 
 
@@ -135,7 +156,9 @@ class RunningSumAccumulator(Accumulator):
             super().__init__()
             general_logger.debug("Initialized RunningSumAccumulator")
         except Exception as e:
-            raise AccumulatorError(f"Failed to initialize RunningSumAccumulator: {str(e)}")
+            raise AccumulatorError(
+                f"Failed to initialize RunningSumAccumulator: {str(e)}"
+            )
 
     def update(self, gradients: Dict[str, torch.Tensor], weight: float = 1.0) -> None:
         """Update by summing gradients along 0-axis."""
@@ -161,18 +184,24 @@ class GradientAggregator:
         try:
             self.aggregation_method = aggregation_method
             self.accumulator = (
-                RunningSumAccumulator() if aggregation_method == AggregationMethod.MEAN else StackedAccumulator()
+                RunningSumAccumulator()
+                if aggregation_method == AggregationMethod.MEAN
+                else StackedAccumulator()
             )
             self._conflicting_gradient_count = 0
             self._nonconflicting_gradient_count = 0
-            general_logger.info(f"Initialized GradientAggregator with {aggregation_method}")
+            general_logger.info(
+                f"Initialized GradientAggregator with {aggregation_method}"
+            )
         except Exception as e:
             raise GradientError(f"Failed to initialize GradientAggregator: {str(e)}")
 
     def reset_accumulator(self) -> None:
         try:
             self.accumulator = (
-                RunningSumAccumulator() if self.aggregation_method == AggregationMethod.MEAN else StackedAccumulator()
+                RunningSumAccumulator()
+                if self.aggregation_method == AggregationMethod.MEAN
+                else StackedAccumulator()
             )
             general_logger.debug("Reset gradient accumulator")
         except Exception as e:
@@ -186,7 +215,9 @@ class GradientAggregator:
                 assert len(grad_tensor) == 2
                 return self.pcgrad_online(grad_tensor)
             else:
-                raise GradientError(f"Unsupported aggregation method: {self.aggregation_method}")
+                raise GradientError(
+                    f"Unsupported aggregation method: {self.aggregation_method}"
+                )
         except Exception as e:
             raise GradientError(f"Failed to find nonconflicting gradient: {str(e)}")
 
@@ -195,13 +226,18 @@ class GradientAggregator:
             conflicting_grads = self.accumulator.get_gradients()
             length = len(conflicting_grads[list(conflicting_grads.keys())[0]])
 
-            if (self.aggregation_method == AggregationMethod.PCGRAD_ONLINE
-                    or self.aggregation_method == AggregationMethod.MEAN):
+            if (
+                self.aggregation_method == AggregationMethod.PCGRAD_ONLINE
+                or self.aggregation_method == AggregationMethod.MEAN
+            ):
                 assert length == 1
                 return self.accumulator.get_avg_gradients()
 
             elif self.aggregation_method == AggregationMethod.PCGRAD:
-                conflicting_grads = [{k: v[i, ...] for k, v in conflicting_grads.items()} for i in range(length)]
+                conflicting_grads = [
+                    {k: v[i, ...] for k, v in conflicting_grads.items()}
+                    for i in range(length)
+                ]
                 final_grad: Dict[str, torch.Tensor] = {}
 
                 if len(conflicting_grads) == 1:
@@ -209,12 +245,22 @@ class GradientAggregator:
 
                 keys = list(conflicting_grads[0].keys())
                 for layer_key in keys:
-                    list_of_st_grads = [st_grad[layer_key] for st_grad in conflicting_grads]
-                    final_grad.update({layer_key: self.find_nonconflicting_grad(torch.stack(list_of_st_grads, dim=0))})
+                    list_of_st_grads = [
+                        st_grad[layer_key] for st_grad in conflicting_grads
+                    ]
+                    final_grad.update(
+                        {
+                            layer_key: self.find_nonconflicting_grad(
+                                torch.stack(list_of_st_grads, dim=0)
+                            )
+                        }
+                    )
 
                 return final_grad
             else:
-                raise GradientError(f"Unsupported aggregation method: {self.aggregation_method}")
+                raise GradientError(
+                    f"Unsupported aggregation method: {self.aggregation_method}"
+                )
         except Exception as e:
             raise GradientError(f"Gradient aggregation failed: {str(e)}")
 
@@ -232,7 +278,9 @@ class GradientAggregator:
                 for g_j in task_index:
                     dot_product = pc_grads[g_i].dot(grad_tensor[g_j])
                     if dot_product < 0:
-                        pc_grads[g_i] -= (dot_product / (grad_tensor[g_j].norm() ** 2)) * grad_tensor[g_j]
+                        pc_grads[g_i] -= (
+                            dot_product / (grad_tensor[g_j].norm() ** 2)
+                        ) * grad_tensor[g_j]
                         self._conflicting_gradient_count += 1
                     else:
                         self._nonconflicting_gradient_count += 1
@@ -262,7 +310,10 @@ class GradientAggregator:
         try:
             conflicting_grads = self.accumulator.get_gradients()
             length = len(conflicting_grads[list(conflicting_grads.keys())[0]])
-            conflicting_grads = [{k: v[i, ...] for k, v in conflicting_grads.items()} for i in range(length)]
+            conflicting_grads = [
+                {k: v[i, ...] for k, v in conflicting_grads.items()}
+                for i in range(length)
+            ]
             current_overall_grad: Dict[str, torch.Tensor] = {}
 
             if length == 1:
@@ -270,9 +321,15 @@ class GradientAggregator:
             elif length == 2:
                 keys = list(conflicting_grads[0].keys())
                 for layer_key in keys:
-                    list_of_st_grads = [st_grad[layer_key] for st_grad in conflicting_grads]
+                    list_of_st_grads = [
+                        st_grad[layer_key] for st_grad in conflicting_grads
+                    ]
                     current_overall_grad.update(
-                        {layer_key: self.find_nonconflicting_grad(torch.stack(list_of_st_grads, dim=0))}
+                        {
+                            layer_key: self.find_nonconflicting_grad(
+                                torch.stack(list_of_st_grads, dim=0)
+                            )
+                        }
                     )
                 return current_overall_grad
             else:
@@ -284,7 +341,9 @@ class GradientAggregator:
         try:
             self.accumulator.update(gradients=gradients, weight=scaling_weight)
             if self.aggregation_method == AggregationMethod.PCGRAD_ONLINE:
-                self.accumulator.set_gradients(gradients=self.aggregate_gradients_online())
+                self.accumulator.set_gradients(
+                    gradients=self.aggregate_gradients_online()
+                )
         except Exception as e:
             raise GradientError(f"Failed to update gradients: {str(e)}")
 
@@ -292,10 +351,15 @@ class GradientAggregator:
         try:
             if self.aggregation_method == AggregationMethod.MEAN:
                 raise GradientError("Cannot get conflict ratio for MEAN method")
-            if self._conflicting_gradient_count + self._nonconflicting_gradient_count == 0:
+            if (
+                self._conflicting_gradient_count + self._nonconflicting_gradient_count
+                == 0
+            ):
                 raise GradientError("No gradients processed yet")
             return self._conflicting_gradient_count / (
-                    self._conflicting_gradient_count + self._nonconflicting_gradient_count
+                self._conflicting_gradient_count + self._nonconflicting_gradient_count
             )
         except Exception as e:
-            raise GradientError(f"Failed to calculate gradient conflict ratio: {str(e)}")
+            raise GradientError(
+                f"Failed to calculate gradient conflict ratio: {str(e)}"
+            )
