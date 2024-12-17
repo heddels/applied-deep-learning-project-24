@@ -5,15 +5,15 @@ and conflict resolution in multi-task learning settings.
 """
 
 import copy
+import random
 from typing import Dict, Optional
+
 import torch
 from torch import nn
-import random
-import numpy as np
 
+from media_bias_detection.utils.common import rsetattr
 from media_bias_detection.utils.enums import AggregationMethod
 from media_bias_detection.utils.logger import general_logger
-from media_bias_detection.utils.common import rsetattr
 
 
 class GradientError(Exception):

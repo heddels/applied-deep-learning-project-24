@@ -1,22 +1,22 @@
+import os
+
 import wandb
 
-# Import configuration and utilities
-from media_bias_detection.utils.enums import Split, AggregationMethod, LossScaling
-from media_bias_detection.utils.common import set_random_seed
 from media_bias_detection.config.config import (
     MAX_NUMBER_OF_STEPS,
     head_specific_lr,
     head_specific_max_epoch,
     head_specific_patience
 )
-from media_bias_detection.training.training_utils import Logger, EarlyStoppingMode
-
 from media_bias_detection.data import test_tasks, test_subtasks
-
 from media_bias_detection.training.trainer import Trainer
+from media_bias_detection.training.training_utils import Logger, EarlyStoppingMode
+from media_bias_detection.utils.common import set_random_seed
+# Import configuration and utilities
+from media_bias_detection.utils.enums import Split, AggregationMethod, LossScaling
 
-import os
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
 
 def main():
     EXPERIMENT_NAME = "experiment_debug_check"
@@ -32,7 +32,7 @@ def main():
 
     # Configure training_baseline parameters
     config = {
-        "sub_batch_size": 32,
+        "head_specific_sub_batch_size": 32,
         "eval_batch_size": 128,
         "initial_lr": 4e-5,
         "dropout_prob": 0.1,
@@ -73,15 +73,15 @@ def main():
         trainer.eval(split=Split.TEST)
 
         # Save the model
-        trainer.save_model()
+        # trainer.save_model()
 
     except Exception as e:
         print(f"Debug training failed with error: {str(e)}")
         raise e
 
     finally:
-        # Always make sure to close wandb
-       wandb.finish()
+        wandb.finish()
+
 
 if __name__ == "__main__":
     main()

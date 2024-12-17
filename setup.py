@@ -3,12 +3,12 @@ from setuptools import setup, find_packages
 
 setup(
     name="media_bias_detection",  # Name of your package
-    version="0.1",               # Version number
+    version="0.1",  # Version number
     description="Multi-Task Learning Model for Media Bias Detection",
     author="Hedda Fiedler",
     packages=find_packages(where="src"),  # Tells pip to look in src directory
-    package_dir={"": "src"},     # Root directory for the package
-    install_requires=[# Core Deep Learning
+    package_dir={"": "src"},  # Root directory for the package
+    install_requires=[  # Core Deep Learning
         "torch>=2.0.0",
         "transformers>=4.30.0",
         "torchmetrics>=1.0.0",
@@ -37,5 +37,5 @@ setup(
         "joblib>=1.3.0",
         "pathlib>=1.0.1",
     ],
-    python_requires=">=3.8",    # Minimum Python version
+    python_requires=">=3.8",  # Minimum Python version
 )

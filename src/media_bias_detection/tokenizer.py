@@ -1,7 +1,6 @@
 """Tokenizer module providing a singleton tokenizer instance."""
 
 from transformers import DistilBertTokenizerFast
-from media_bias_detection.utils.logger import general_logger
 
 
 class Tokenizer:

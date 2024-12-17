@@ -6,28 +6,26 @@ Provides enhanced training_baseline functionality with:
 - Detailed logging
 - Training efficiency improvements
 """
-from typing import Dict, List, Optional, Any
-from pathlib import Path
 import gc
+import statistics as stats
 import time
+from pathlib import Path
+from typing import Dict, List, Optional, Any
 
 import numpy as np
 import psutil
 import torch
-import statistics as stats
 from tqdm import tqdm
 from transformers import get_polynomial_decay_schedule_with_warmup
 
+from media_bias_detection.training.gradient import GradientAggregator, AggregationMethod
+from .metrics import Tracker
+from .training_utils import Logger, EarlyStopper, EarlyStoppingMode
+from ..data.dataset import BatchData
+from ..data.task import Task
 from ..model.model_factory import ModelFactory
 from ..utils.enums import Split, LossScaling
 from ..utils.logger import general_logger
-from .metrics import Tracker
-from .checkpoint_system import ModelCheckpoint
-from .training_utils import Logger, EarlyStopper, EarlyStoppingMode
-
-from ..model.gradient import GradientAggregator, AggregationMethod
-from ..data.task import Task
-from ..data.dataset import BatchData
 
 
 class TrainerError(Exception):
@@ -52,7 +50,7 @@ class Trainer:
             model_name: str,
             max_steps: int,
             pretrained_path: Optional[str],
-            sub_batch_size: int,
+            head_specific_sub_batch_size: Dict[str, int],
             eval_batch_size: int,
             early_stopping_mode,
             resurrection: bool,
@@ -81,7 +79,7 @@ class Trainer:
 
             self.model, batch_list_train, batch_list_dev, batch_list_eval, batch_list_test = ModelFactory(
                 task_list=task_list,
-                sub_batch_size=sub_batch_size,
+                head_specific_sub_batch_size=head_specific_sub_batch_size,
                 eval_batch_size=eval_batch_size,
                 pretrained_path=pretrained_path,
                 *args,
@@ -140,13 +138,6 @@ class Trainer:
             # Memory tracking
             self._last_memory_check = time.time()
             self._memory_check_interval = 60  # seconds
-
-            #checkpoint initialization
-            self.checkpoint_manager = ModelCheckpoint(
-                save_dir=f"checkpoints/{model_name}",
-                save_freq=50,
-                monitor='combined_dev_loss',  # Monitor validation loss
-            )
 
             general_logger.info(
                 f"Trainer initialized successfully on {self.device}"
@@ -434,19 +425,6 @@ class Trainer:
                     additional_payload=train_payload
                 )
 
-                # Add checkpoint saving every 50 steps
-                if step % 50 == 0:  # Only save every 50 steps
-                    metrics = {
-                        'combined_dev_loss': self.tracker.combined_losses[Split.DEV].mean_last_k(1),
-                        'step': step
-                    }
-
-                    self.checkpoint_manager.save_checkpoint(
-                        model=self.model,
-                        step=step,
-                        metrics=metrics
-                    )
-                    general_logger.info(f"Saved checkpoint at step {step}")
                 # Periodic memory optimization
                 if step % 100 == 0:
                     self._optimize_memory()

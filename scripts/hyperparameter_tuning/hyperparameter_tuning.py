@@ -1,22 +1,23 @@
 """This module can be executed to run a hyperparameter training_baseline job for multiple tasks, each task alone.
 It is taken from the scripts/hyperparameter_tuning/hyperparameter_tuning.py file. of the MAGPIE repository."""
 
+import os
+
 import wandb
+
+import media_bias_detection.data
 from media_bias_detection.config.config import (
     hyper_param_dict,
     head_specific_lr,
     head_specific_max_epoch,
-    head_specific_patience, MAX_NUMBER_OF_STEPS
+    head_specific_patience
 )
-from media_bias_detection.utils.enums import AggregationMethod, LossScaling
-from media_bias_detection.data import all_subtasks
 from media_bias_detection.data.task import Task
-from media_bias_detection.training.training_utils import EarlyStoppingMode, Logger
 from media_bias_detection.training.trainer import Trainer
+from media_bias_detection.training.training_utils import EarlyStoppingMode, Logger
 from media_bias_detection.utils.common import set_random_seed
-import media_bias_detection.data
+from media_bias_detection.utils.enums import AggregationMethod, LossScaling
 
-import os
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 
@@ -32,7 +33,7 @@ def train_wrapper():
 
     our_config = {
         # Parameters to tune with wandb
-        "sub_batch_size": wandb.config.sub_batch_size,
+        "head_specific_sub_batch_size": wandb.config.sub_batch_size,
         "num_warmup_steps": wandb.config.num_warmup_steps,
         "dropout_prob": wandb.config.dropout_prob,
         # Fixed parameters
@@ -45,7 +46,7 @@ def train_wrapper():
         "aggregation_method": AggregationMethod.MEAN,
         "loss_scaling": LossScaling.UNIFORM,
         "model_name": "hyperparameter_tuning",
-        "pretrained_path": None,
+        "pretrained_path": "model_files/pre_finetuned_model.pth",
         "resurrection": False,
         "head_specific_lr_dict": head_specific_lr,
         "head_specific_patience_dict": head_specific_patience,
@@ -58,15 +59,15 @@ def train_wrapper():
 
 
 if __name__ == "__main__":
-    for st in [media_bias_detection.data.st_1_gwsd_128]: # change to all_subtasks, if it is working
+    for st in [media_bias_detection.data.st_2_babe_10]:
         st.process()
         task_wrapper = [Task(task_id=st.id, subtasks_list=[st])]
 
         # wandb sweep
-        sweep_config = {"method": "random",
+        sweep_config = {"method": "grid",
                         "metric": {"name": "eval_f1", "goal": "maximize"},
                         "parameters": hyper_param_dict,
-                        "early_terminate": { "type": "hyperband", "min_iter": 3},
+                        "early_terminate": {"type": "hyperband", "min_iter": 3},
                         "name": str(st)}
         sweep_id = wandb.sweep(sweep_config, project="hyperparam-tuning")
 

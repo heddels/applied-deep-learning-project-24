@@ -1,15 +1,14 @@
 """Main MTL model implementation."""
 
-from typing import Dict, Tuple, Optional
-import torch
-from torch import nn
 from typing import List
 
-from ..tokenizer import tokenizer
+import torch
+from torch import nn
+
 from .backbone import BackboneLM
 from .heads import HeadFactory
+from ..tokenizer import tokenizer
 from ..utils.logger import general_logger
-from ..data.dataset import BatchData
 
 
 class Model(nn.Module):

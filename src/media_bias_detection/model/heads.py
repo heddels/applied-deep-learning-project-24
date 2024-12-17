@@ -5,22 +5,20 @@ Each head implements specific logic for different types of tasks while maintaini
 consistent interfaces for the MTL architecture.
 """
 
-from typing import Dict, Tuple, Optional, Union
+from typing import Dict, Tuple, Optional
+
 import torch
 from torch import nn
-import torch.nn.functional as F
-from torchmetrics import Accuracy, F1Score, MeanSquaredError, Perplexity, R2Score
+from torchmetrics import Accuracy, F1Score
 
-from .gradient import GradsWrapper
-from ..tokenizer import tokenizer
-from ..utils.logger import general_logger
-from ..utils.common import get_class_weights
+from media_bias_detection.training.gradient import GradsWrapper
 from ..data.task import (
     SubTask,
     ClassificationSubTask,
     MultiLabelClassificationSubTask,
     POSSubTask
 )
+from ..utils.logger import general_logger
 
 
 class HeadError(Exception):

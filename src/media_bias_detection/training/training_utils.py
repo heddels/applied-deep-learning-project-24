@@ -6,18 +6,15 @@ Contains utility classes for:
 
 """
 
+import logging
 import math
 import os
-import logging
-
 from enum import Enum
-from typing import Dict, List, Any, Optional
-
-from media_bias_detection.utils.logger import general_logger
-from media_bias_detection.utils.enums import Split
+from typing import Dict, List, Any
 
 import wandb
 
+from media_bias_detection.utils.logger import general_logger
 
 
 class Logger:

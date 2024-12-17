@@ -5,17 +5,18 @@ including data loading, processing, and task-specific operations.
 """
 
 import os
-from typing import List, Tuple, Optional, Dict
-import pandas as pd
-import torch
-import numpy as np
 import re
 from pathlib import Path
+from typing import List, Tuple, Optional, Dict
 
+import numpy as np
+import pandas as pd
+import torch
+
+from media_bias_detection.config.config import DEV_RATIO, MAX_LENGTH, TRAIN_RATIO
 from media_bias_detection.utils.common import get_class_weights
 from media_bias_detection.utils.enums import Split
 from media_bias_detection.utils.logger import general_logger
-from media_bias_detection.config.config import DEV_RATIO, MAX_LENGTH, TRAIN_RATIO
 from ..tokenizer import tokenizer
 
 
@@ -98,7 +99,7 @@ def get_tokens_and_labels(pos_list_list, text_list, labels):
 
     In this objective, we have a list of consecutive spans.
     For each of these consecutive spans, find the correct index of the corresponding tokens in the text_list.
-    Returns the bitwise or ('union') of this ids.
+    Returns the bitwise or ('union') of these ids.
     """
     mask_idxs_list = []
     for i, pos_list in enumerate(pos_list_list):
@@ -124,6 +125,7 @@ def get_tokens_and_labels(pos_list_list, text_list, labels):
 
     return [t.split() for t in text_list], mask_idxs_list
 
+
 class Task:
     """Wrapper class for subtasks.
 
@@ -142,6 +144,7 @@ class Task:
 
     def __str__(self) -> str:
         return str(self.task_id)
+
 
 class SubTask:
     """Base class for all subtasks.
@@ -183,7 +186,7 @@ class SubTask:
             f"using file {self.filename}"
         )
 
-    def process(self, force_download: bool = False, debug: bool = False ) -> None:
+    def process(self, force_download: bool = False, debug: bool = False) -> None:
         """Process and split the data.
 
         Args:
@@ -433,4 +436,3 @@ class POSSubTask(SubTask):
         In case of POS subtask, the domain size equals the vocab size.
         """
         return 1 / np.log(self.num_classes)
-

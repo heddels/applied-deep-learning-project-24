@@ -1,10 +1,10 @@
 """Backbone model module providing the shared language model."""
 
 import torch
-from torch import nn
 from transformers import DistilBertModel
+
+from media_bias_detection.training.gradient import GradsWrapper
 from media_bias_detection.utils.logger import general_logger
-from .gradient import GradsWrapper
 
 
 class BackboneLM(GradsWrapper):

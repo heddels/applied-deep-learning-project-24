@@ -42,6 +42,7 @@ local.env
 # Large files and models
 *.pth
 model_files/
+checkpoints/
 *.pt
 *.h5
 *.ckpt
@@ -51,23 +52,12 @@ model_files/
 *.tar.gz
 *.zip
 
-# Dataset files
-datasets/
-*.csv
-*.json
-*.txt
-!requirements.txt
-!setup.txt
 
 # Logs and cache
 wandb/
-logging/
-logs/
+debug_logs/
+metric_logging/
 *.log
-
-#Old utils for first notebook
-old_utils/
-
 
 # OS specific
 .DS_Store

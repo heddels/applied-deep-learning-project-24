@@ -1,20 +1,20 @@
-import os
-from box.exceptions import BoxValueError
-import yaml
-from media_bias_detection.utils.logger import general_logger
+import functools
 import json
-import joblib
-from ensure import ensure_annotations
-from box import ConfigBox
+import os
+import random
 from pathlib import Path
 from typing import Any
-import functools
-import random
 
+import joblib
 import numpy as np
 import torch
+import yaml
+from box import ConfigBox
+from box.exceptions import BoxValueError
+from ensure import ensure_annotations
 
 from media_bias_detection.config.config import RANDOM_SEED
+from media_bias_detection.utils.logger import general_logger
 
 
 @ensure_annotations
@@ -127,8 +127,11 @@ def get_size(path: Path) -> str:
     size_in_kb = round(os.path.getsize(path) / 1024)
     return f"~ {size_in_kb} KB"
 
-#from here one directly taken from magpie repo old_utils
+
+# from here one directly taken from magpie repo old_utils
 """This module contains old_utils."""
+
+
 @ensure_annotations
 def integer_formatter(i):
     """Format integers.
@@ -140,6 +143,7 @@ def integer_formatter(i):
         return i
     return f"{i:,d}"
 
+
 @ensure_annotations
 def float_formatter(i):
     """Format floats.
@@ -150,6 +154,7 @@ def float_formatter(i):
     if isinstance(i, str):
         return i
     return f"{i:0.3f}"
+
 
 @ensure_annotations
 def get_class_weights(y, method="ins"):
@@ -174,6 +179,7 @@ def get_class_weights(y, method="ins"):
 
     return weights
 
+
 @ensure_annotations
 def set_random_seed(seed=RANDOM_SEED):
     """Random seed for comparable results."""
@@ -189,6 +195,7 @@ def set_random_seed(seed=RANDOM_SEED):
         torch.cuda.manual_seed_all(RANDOM_SEED)
         torch.cuda.manual_seed_all(seed)
 
+
 @ensure_annotations
 def rsetattr(obj, attr, val):
     """Set an attribute recursively.
@@ -198,6 +205,7 @@ def rsetattr(obj, attr, val):
     """
     pre, _, post = attr.rpartition(".")
     return setattr(rgetattr(obj, pre) if pre else obj, post, val)
+
 
 @ensure_annotations
 def rgetattr(obj, attr, *args):

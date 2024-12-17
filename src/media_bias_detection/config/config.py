@@ -26,10 +26,11 @@ dataset_id_to_dataset_name = {
 
 }
 
+
 class TaskFamilies(Enum):
     """Task Families."""
 
-    #MLM = "Masked Language Modelling" dataset was not available
+    # MLM = "Masked Language Modelling" dataset was not available
     SUBJECTIVITY = "Subjectivity"
     MEDIA_BIAS = "Media Bias"
     HATE_SPEECH = "Hate Speech"
@@ -40,19 +41,21 @@ class TaskFamilies(Enum):
     EMOTIONALITY = "Emotionality"
     STANCE_DETECTION = "Stance Detection"
 
+
 dataset_id_to_family = {
-3: TaskFamilies.SUBJECTIVITY, #new dataset the old for category subjectivity wrongly assigned there
+    3: TaskFamilies.SUBJECTIVITY,  # new dataset the old for category subjectivity wrongly assigned there
     10: TaskFamilies.MEDIA_BIAS,
     22: TaskFamilies.SUBJECTIVITY,
     42: TaskFamilies.EMOTIONALITY,
     103: TaskFamilies.SENTIMENT_ANALYSIS,
-    108: TaskFamilies.HATE_SPEECH, # original code had gender bias as task family but from dataset description it is hate speech
+    108: TaskFamilies.HATE_SPEECH,
+    # original code had gender bias as task family but from dataset description it is hate speech
     109: TaskFamilies.GROUP_BIAS,
     116: TaskFamilies.GENDER_BIAS,
     128: TaskFamilies.STANCE_DETECTION,
 }
 
-MAX_NUMBER_OF_STEPS = 200 # changed from 1000 to 100 for prefinetuning and 50 for finetuning for baseline
+MAX_NUMBER_OF_STEPS = 200  # changed from 1000 to 100 for prefinetuning and 50 for finetuning for baseline
 
 # Task-configs
 MAX_LENGTH = 128
@@ -70,6 +73,22 @@ hyper_param_dict = {
     "num_warmup_steps": {"values": [50, 100]},
 }
 
+# head specific batchsize for BABE subtasks
+head_specific_sub_batch_size = {
+    "300001": 32,
+    "10001": 64,
+    "10002": 32,
+    "10301": 32,
+    "10801": 32,
+    "10901": 32,
+    "10902": 32,
+    "11601": 32,
+    "42001": 32,
+    "42002": 32,
+    "12001": 32,
+    "12002": 32,
+    "12801": 32,
+}
 
 # TRAINING parameters - keeping only chosen task IDs
 head_specific_lr = {

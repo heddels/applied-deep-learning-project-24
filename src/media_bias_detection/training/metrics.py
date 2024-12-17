@@ -4,15 +4,14 @@ This module provides classes and utilities for tracking metrics during training_
 computing running averages, and managing metric history.
 """
 
-from typing import Dict, List, Optional, Union, Any
-import numpy as np
 import json
 from pathlib import Path
+from typing import Dict, List, Optional, Union, Any
 
-from ..utils.logger import general_logger
+import numpy as np
+
 from media_bias_detection.utils.enums import Split
-from .training_utils import Logger
-
+from ..utils.logger import general_logger
 
 
 class MetricError(Exception):
