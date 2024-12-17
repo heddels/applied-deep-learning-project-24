@@ -33,7 +33,7 @@ def train_wrapper():
 
     our_config = {
         # Parameters to tune with wandb
-        "head_specific_sub_batch_size": wandb.config.sub_batch_size,
+        "sub_batch_size": wandb.config.sub_batch_size,
         "num_warmup_steps": wandb.config.num_warmup_steps,
         "dropout_prob": wandb.config.dropout_prob,
         # Fixed parameters
@@ -59,7 +59,7 @@ def train_wrapper():
 
 
 if __name__ == "__main__":
-    for st in [media_bias_detection.data.st_2_babe_10]:
+    for st in [media_bias_detection.data.st_2_babe_10]:  # done for st_1_babe_10 and st_2_babe_10
         st.process()
         task_wrapper = [Task(task_id=st.id, subtasks_list=[st])]
 

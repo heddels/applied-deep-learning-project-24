@@ -4,7 +4,7 @@ from typing import Dict
 
 import wandb
 
-from media_bias_detection.config.config import head_specific_lr, MAX_NUMBER_OF_STEPS, head_specific_sub_batch_size
+from media_bias_detection.config.config import head_specific_lr, MAX_NUMBER_OF_STEPS
 from media_bias_detection.data import test_tasks
 from media_bias_detection.training.trainer import Trainer
 from media_bias_detection.training.training_utils import Logger, EarlyStoppingMode
@@ -45,7 +45,7 @@ def main():
             subtask.process(debug=True)  # Use debug flag
 
     config = {
-        "head_specific_sub_batch_size": head_specific_sub_batch_size,
+        "sub_batch_size": 32,
         "eval_batch_size": 32,
         "initial_lr": 4e-5,
         "dropout_prob": 0.1,

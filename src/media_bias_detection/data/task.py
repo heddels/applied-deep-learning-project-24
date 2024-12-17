@@ -321,11 +321,9 @@ class MultiLabelClassificationSubTask(SubTask):
         self.num_classes = None
         self.num_classes = num_classes
         self.num_labels = num_labels
-        print(f"MultiClass Subtask {self.id}:\nNum classes: {num_classes}, Num labels: {num_labels}")
 
     def load_data(self, debug: bool = False) -> Tuple[torch.LongTensor, torch.LongTensor, torch.LongTensor]:
         """Load the data of a MultiLabelClassificationSubTask."""
-        print(f"Loading data for MultiLabelClassificationSubTask {self.id}")
         df = pd.read_csv(self.filename)
         if debug:
             # Take only first 100 samples for debugging

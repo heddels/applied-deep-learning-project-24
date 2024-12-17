@@ -2,7 +2,7 @@
 
 """Module for creating instantiating the appropriate model defined by the task list only."""
 
-from typing import List, Dict
+from typing import List
 
 import torch
 
@@ -14,7 +14,7 @@ from ..utils.logger import general_logger
 
 def ModelFactory(
         task_list: List,
-        head_specific_sub_batch_size: Dict[str, int],
+        sub_batch_size: int,
         eval_batch_size: int,
         pretrained_path: str = None,
         *args,
@@ -41,13 +41,13 @@ def ModelFactory(
         # Create dataloaders with updated classes
         batch_list_train = BatchList(
             subtask_list=subtask_list,
-            sub_batch_size=head_specific_sub_batch_size,
+            sub_batch_size=sub_batch_size,
             split=Split.TRAIN
         )
 
         batch_list_dev = BatchList(
             subtask_list=subtask_list,
-            sub_batch_size=head_specific_sub_batch_size,
+            sub_batch_size=sub_batch_size,
             split=Split.DEV
         )
 

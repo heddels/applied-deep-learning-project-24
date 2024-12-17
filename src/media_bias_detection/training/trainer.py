@@ -50,7 +50,7 @@ class Trainer:
             model_name: str,
             max_steps: int,
             pretrained_path: Optional[str],
-            head_specific_sub_batch_size: Dict[str, int],
+            sub_batch_size: int,
             eval_batch_size: int,
             early_stopping_mode,
             resurrection: bool,
@@ -79,7 +79,7 @@ class Trainer:
 
             self.model, batch_list_train, batch_list_dev, batch_list_eval, batch_list_test = ModelFactory(
                 task_list=task_list,
-                head_specific_sub_batch_size=head_specific_sub_batch_size,
+                sub_batch_size=sub_batch_size,
                 eval_batch_size=eval_batch_size,
                 pretrained_path=pretrained_path,
                 *args,

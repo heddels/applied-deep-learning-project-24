@@ -7,7 +7,7 @@ and batch generation for the MTL training_baseline process.
 import random
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import List, Tuple, Dict, Union
+from typing import List, Tuple
 
 import numpy as np
 import torch
@@ -130,7 +130,7 @@ class BatchList:
     memory-efficient data loading.
 
     Attributes:
-        head_specific_sub_batch_size: Size of each sub-batch
+        sub_batch_size: Size of each sub-batch
         datasets: Mapping of subtask IDs to datasets
         dataloaders: Mapping of subtask IDs to dataloaders
         iter_dataloaders: Mapping of subtask IDs to dataloader iterators
@@ -139,7 +139,7 @@ class BatchList:
     def __init__(
             self,
             subtask_list: List[SubTask],
-            sub_batch_size: Union[int, Dict[str, int]],
+            sub_batch_size: int,
             split: Split = Split.TRAIN,
             num_workers: int = 0,
             pin_memory: bool = True
@@ -148,7 +148,7 @@ class BatchList:
 
         Args:
             subtask_list: List of subtasks to create batches for
-            head_specific_sub_batch_size: Size of each sub-batch, specific to each subtask
+            sub_batch_size: Size of each sub-batch
             split: Which data split to use
             num_workers: Number of worker processes for data loading
             pin_memory: Whether to pin memory in GPU training_baseline
@@ -159,31 +159,17 @@ class BatchList:
         )
 
         self.split = split
-
-        if isinstance(sub_batch_size, int):
-            # If integer, create a dictionary with same batch size for all tasks
-            self.head_specific_sub_batch_size = {
-                str(st.id): sub_batch_size for st in subtask_list
-            }
-        else:
-            # If dictionary, use as is
-            self.head_specific_sub_batch_size = sub_batch_size
-
-        # Debug logging
-        general_logger.debug(f"Batch size dict keys: {self.head_specific_sub_batch_size.keys()}")
+        self.sub_batch_size = sub_batch_size
 
         self.datasets = {
             str(st.id): SubTaskDataset(subtask=st, split=split)
             for st in subtask_list
         }
 
-        # Debug logging
-        general_logger.debug(f"Dataset keys: {self.datasets.keys()}")
-
         self.dataloaders = {
             st_id: DataLoader(
                 dataset,
-                batch_size=self.head_specific_sub_batch_size[st_id],
+                batch_size=self.sub_batch_size,
                 num_workers=num_workers,
                 pin_memory=pin_memory
             )

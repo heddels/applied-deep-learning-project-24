@@ -14,7 +14,6 @@ from media_bias_detection.data.task import Task
 from media_bias_detection.training.trainer import Trainer
 from media_bias_detection.training.training_utils import Logger, EarlyStoppingMode
 from media_bias_detection.utils.common import set_random_seed
-# Import configuration and utilities
 from media_bias_detection.utils.enums import Split, AggregationMethod, LossScaling
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -31,7 +30,7 @@ def main():
             st.process()
 
     config = {
-        "head_specific_sub_batch_size": 32,
+        "sub_batch_size": 32,
         "eval_batch_size": 128,
         "initial_lr": 4e-5,
         "dropout_prob": 0.1,

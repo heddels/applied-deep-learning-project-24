@@ -15,7 +15,6 @@ from media_bias_detection.config.config import (
     head_specific_lr,
     head_specific_max_epoch,
     head_specific_patience,
-    head_specific_sub_batch_size,
 )
 from media_bias_detection.data import st_1_babe_10 as babe
 from media_bias_detection.data.task import Task
@@ -150,7 +149,7 @@ def main():
 
     # Use optimal hyperparameters found
     config = {
-        "head_specific_sub_batch_size": head_specific_sub_batch_size,  # Optimal from hyperparameter search
+        "sub_batch_size": 64,  # Optimal from hyperparameter search
         "eval_batch_size": 128,
         "initial_lr": 4e-5,
         "dropout_prob": 0.1,  # Optimal from hyperparameter search
@@ -171,12 +170,12 @@ def main():
     }
 
     # Run multiple evaluations with different seeds
-    for i in range(10):
+    for i in range(1):
         seed = i
         set_random_seed(seed)
 
         try:
-            print(f"\nStarting run {i + 1}/30 with seed {seed}")
+            print(f"\nStarting run {i + 1}/10 with seed {seed}")
 
             run = wandb.init(
                 project=EXPERIMENT_NAME,
