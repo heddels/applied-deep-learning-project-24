@@ -206,8 +206,8 @@ The following table outlines the tasks and their respective time estimates and d
 > **Note**: Details regarding target in the [Target Metric Specification](#target-metric-specification) section
 
 - Achieved Metrics:
-    - 0.71 (Max of Baseline Model runs)
-    - xx (after hyperparameter tuning)
+    - 0.71 (Maximum of Baseline Model runs)
+    - 0.78 (Maximum after hyperparameter tuning)
 
 > **Note**: Full results and analysis available in the [Results](#results) section
 
@@ -398,7 +398,14 @@ Results:
 
 ### Final Model Results
 
-... coming soon, still running
+With the optimal hyperparameters from the hyperparameter optimization,
+I trained the final model finetuning step over 10 random seeds.
+
+| Metric   | Mean   | Std Dev | Min    | Max        |
+|----------|--------|---------|--------|------------|
+| F1 Score | 0.7587 | 0.0108  | 0.7415 | **0.7773** |
+| Accuracy | 0.7772 | 0.0098  | 0.7604 | 0.7946     |
+| Loss     | 0.5120 | 0.0134  | 0.4920 | 0.5282     |
 
 ### Open Issues
 
