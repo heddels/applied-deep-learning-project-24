@@ -48,7 +48,7 @@ computationally efficient solution while maintaining high accuracy in bias detec
 ### Prerequisites
 
 - Python 3.8 or higher
-- CUDA-compatible GPU (recommended) or CPU
+- CUDA-compatible GPU or CPU
 - 8GB RAM minimum
 
 ### Step-by-Step Installation
