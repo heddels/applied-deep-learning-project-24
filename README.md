@@ -48,7 +48,7 @@ computationally efficient solution while maintaining high accuracy in bias detec
 ### Prerequisites
 
 - Python 3.8 or higher
-- CUDA-compatible GPU (recommended) or CPU
+- CUDA-compatible GPU or CPU
 - 8GB RAM minimum
 
 ### Step-by-Step Installation
@@ -213,9 +213,9 @@ The following table outlines the tasks and their respective time estimates and d
 
 ### Time Tracking
 
-1. **Initial Setup** (9h)
+1. **Initial Setup** (12h)
     - Environment setup and MLFlow configuration with MLOps tutorial (6h)
-    - Code understanding and repository analysis (3h)
+    - Code understanding and repository analysis (6h)
 
 
 2. **First Implementation Attempt** (30h)
@@ -231,11 +231,11 @@ The following table outlines the tasks and their respective time estimates and d
     - Hyperparameter optimization setup (6h)
 
 
-4. **Running Experiments** (~XXh compute time)
+4. **Running Experiments** (~52h compute time)
     - Pre-finetuning run for baseline (8h)
     - Finetuning across 30 seeds for baseline (16h)
     - Hyperparameter optimization (16h)
-    - Final model training (XXh)
+    - Final model training (12h)
 
 ### Target Metric Specification
 
