@@ -6,6 +6,7 @@ import numpy as np
 import streamlit as st
 import torch
 import torch.nn.functional as F
+from huggingface_hub import hf_hub_download
 from nltk import sent_tokenize
 from tqdm import tqdm
 from transformers import AutoModel
@@ -92,8 +93,16 @@ class Model(nn.Module):
 class ModelInference:
     def __init__(self):
         self.tokenizer = AutoTokenizer.from_pretrained('distilbert-base-uncased')
+
+        # Download model from Hugging Face
+        model_path = "heddels/media-bias-detection"  # replace with your actual username/repo
+        model_file = hf_hub_download(
+            repo_id=model_path,
+            filename="finetuned_babe_model_final.pth"
+        )
+
         self.model = Model(
-            weight_file=".streamlit/model_files/finetuned_babe_model_final.pth",
+            weight_file=model_file,  # Now using downloaded file
             st_id='10001',
             num_classes=2
         )
