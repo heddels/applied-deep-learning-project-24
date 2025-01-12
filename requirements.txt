@@ -1,13 +1,7 @@
 # Core Installation
 -e .   # Installs your package and core dependencies from setup.py
 
-# Development Tools
-black>=23.0.0
-isort>=5.12.0
-flake8>=6.0.0
-pytest>=7.0.0
-
-# Explicit listing of all dependencies (including those in setup.py)
+# Core dependencies for model and training
 torch>=2.0.0
 transformers>=4.30.0
 numpy>=1.24.0
@@ -28,3 +22,9 @@ pathlib>=1.0.1
 scikit-learn>=1.0.0
 plotly>=5.0.0
 jupyter>=1.0.0
+
+# Development Tools
+black>=23.0.0
+isort>=5.12.0
+flake8>=6.0.0
+pytest>=7.0.0
