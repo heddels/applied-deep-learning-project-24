@@ -1,12 +1,14 @@
 # Applied Deep Learning: Project Proposal
 
-[![Project Status: Active](https://img.shields.io/badge/Project%20Status-Active-green)](https://github.com/heddels/applied-deep-learning-project-24.git)
+[![Project Status: Completed](https://img.shields.io/badge/Project%20Status-Completed-blue)](https://github.com/heddels/applied-deep-learning-project-24.git)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](requirements.txt)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 A deep learning project focused on detecting media bias using a multi-task learning approach.
 This model adapts the [MAGPIE](https://github.com/Media-Bias-Group/magpie-multi-task) architecture to create a more
 computationally efficient solution while maintaining high accuracy in bias detection.
+A demo interface of the model can be tryed
+out [here](https://applied-deep-learning-project-24-24jmvmdprddcoq7ka77wbp.streamlit.app/).
 
 ## 📚 Table of Contents
 
@@ -37,7 +39,7 @@ computationally efficient solution while maintaining high accuracy in bias detec
         - [Final Model Results](#final-model-results)
     - [Open Issues](#open-issues)
 
-- [TODO's (for third phase)](#-todos-for-third-phase)
+- [Demo Application](#demo-application)
 
 - [License](#-license)
 
@@ -275,8 +277,10 @@ and the code was modularized in a slightly different way.
 ```bash
 project_root/
 ├── README.md                        # Main documentation file
+├── 2501_ADL_report.pdf              # Project report
 ├── requirements.txt                 # Package dependencies
 ├── setup.py                         # Installation configuration
+├── bias-detection-app/              # Code and requirements for the Streamlit app
 ├── datasets/                        # Raw and processed data files
 ├── src/                             # Source code directory
 │   │
@@ -411,21 +415,20 @@ I trained the final model finetuning step over 10 random seeds.
 
 - Did not build a proper CI pipeline (only manual testing)
 - Config File for hyperparameters etc. not in a good format and should be in a different place
-- Better organization of the scripts necessary
-- Better documentation of the code and the repository
+- Better organization of the scripts would have helped to build the code base
 
-## ✅ TODO's (for third phase)
+## 🚀 Demo Application
 
-- [ ] Savel final Model and Build Inference Pipeline
-- [ ] Build interface for model
-- [ ] Write final report
+For the demo application, I built a simple Streamlit app that allows users to input text and receive bias detection
+results.
+In order to use the trained model, I uploaded the final model weights to hugginghace.co.
 
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ----------------------------------------------------------------------------------------------------------------
-Last updated: January 04, 2025
+Last updated: January 14, 2025
 
 
 
